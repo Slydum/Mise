@@ -93,7 +93,11 @@ export function GroceryScreen() {
                 {doneCount} of {total} items
               </p>
               <p className="text-sm text-muted-foreground">
-                {total - doneCount === 0 ? "All done 🎉" : `${total - doneCount} to go`}
+                {total === 0
+                  ? "0%"
+                  : doneCount === total
+                    ? "All done 🎉"
+                    : `${Math.round((doneCount / total) * 100)}% complete`}
               </p>
             </div>
             <Progress

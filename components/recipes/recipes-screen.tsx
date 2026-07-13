@@ -29,6 +29,7 @@ const FILTERS: { id: string; label: string; filter: Filter }[] = [
   { id: "snack", label: MEAL_TYPE_LABELS.snack, filter: { kind: "meal", value: "snack" } },
   { id: "quick", label: RECIPE_TAG_LABELS.quick, filter: { kind: "tag", value: "quick" } },
   { id: "vegetarian", label: RECIPE_TAG_LABELS.vegetarian, filter: { kind: "tag", value: "vegetarian" } },
+  { id: "pescatarian", label: RECIPE_TAG_LABELS.pescatarian, filter: { kind: "tag", value: "pescatarian" } },
   { id: "high-protein", label: RECIPE_TAG_LABELS["high-protein"], filter: { kind: "tag", value: "high-protein" } },
 ];
 

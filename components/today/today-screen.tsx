@@ -147,7 +147,7 @@ export function TodayScreen() {
   const loading = !plan || !recipes || !profile;
 
   return (
-    <div className="flex flex-col gap-8 pb-6 pt-4 animate-fade-up">
+    <div className="flex flex-col gap-6 pb-6 pt-3 animate-fade-up">
       <header className="px-5">
         {/* Date and greeting are computed at render time, so the statically
             prerendered HTML can differ from the client — suppress the
@@ -205,7 +205,7 @@ export function TodayScreen() {
 
 function TodaySkeleton() {
   return (
-    <div className="flex flex-col gap-8 px-5" aria-hidden>
+    <div className="flex flex-col gap-6 px-5" aria-hidden>
       <Skeleton className="h-64 rounded-3xl" />
       <div className="flex justify-center gap-6">
         <Skeleton className="size-[100px] rounded-full" />

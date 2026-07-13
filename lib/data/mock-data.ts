@@ -4,6 +4,18 @@ import type { GroceryItem, Recipe, UseSoonItem, UserProfile } from "@/lib/types"
  * Mock content for Mise. This file is only imported by the data provider
  * (`lib/data/index.ts`) — UI components never touch it directly, so it can be
  * deleted wholesale once Supabase is wired up.
+ *
+ * Tag conventions (kept accurate deliberately, since Recipes/RecipeCard
+ * surface these directly to the user):
+ * - `dietaryStyles` drives compatibility filtering (see lib/diet.ts) and is
+ *   the source of truth for what a recipe actually contains.
+ * - `tags` is the display/filter layer. Each recipe's identity tag
+ *   (vegan/vegetarian/pescatarian) is listed first so RecipeCard's
+ *   single-badge overlay always shows the most decision-relevant chip.
+ *   "dairy-free" and "contains-eggs" are only applied when the ingredient
+ *   list genuinely supports it — plant milks (almond, coconut) don't count
+ *   as dairy even though they're bucketed under the "dairy" grocery
+ *   category for shopping-aisle purposes.
  */
 
 export const mockRecipes: Recipe[] = [
@@ -14,7 +26,7 @@ export const mockRecipes: Recipe[] = [
       "Creamy oats soaked overnight with almond milk, chia, and a handful of berries. Zero morning effort.",
     emoji: "🫐",
     mealTypes: ["breakfast"],
-    tags: ["vegetarian", "quick"],
+    tags: ["vegan", "vegetarian", "quick", "dairy-free"],
     dietaryStyles: ["vegan", "vegetarian", "pescatarian", "omnivore"],
     prepMinutes: 5,
     cookMinutes: 0,
@@ -40,7 +52,7 @@ export const mockRecipes: Recipe[] = [
       "Sourdough piled with smashed avocado, jammy eggs, chili flakes, and lemon.",
     emoji: "🥑",
     mealTypes: ["breakfast", "lunch"],
-    tags: ["vegetarian", "quick", "high-protein"],
+    tags: ["vegetarian", "high-protein", "quick", "dairy-free", "contains-eggs"],
     dietaryStyles: ["vegetarian", "pescatarian", "omnivore"],
     prepMinutes: 5,
     cookMinutes: 8,
@@ -67,7 +79,7 @@ export const mockRecipes: Recipe[] = [
       "Thick yogurt with honey, toasted granola, and banana — a five-minute protein hit.",
     emoji: "🍯",
     mealTypes: ["breakfast", "snack"],
-    tags: ["vegetarian", "quick", "high-protein", "gluten-free"],
+    tags: ["vegetarian", "high-protein", "quick", "gluten-free"],
     dietaryStyles: ["vegetarian", "pescatarian", "omnivore"],
     prepMinutes: 5,
     cookMinutes: 0,
@@ -91,7 +103,7 @@ export const mockRecipes: Recipe[] = [
       "Eggs gently poached in a smoky, spiced tomato and pepper sauce, finished with crumbled feta.",
     emoji: "🍳",
     mealTypes: ["breakfast"],
-    tags: ["vegetarian", "high-protein", "comfort"],
+    tags: ["vegetarian", "high-protein", "comfort", "contains-eggs"],
     dietaryStyles: ["vegetarian", "pescatarian", "omnivore"],
     prepMinutes: 10,
     cookMinutes: 20,
@@ -152,7 +164,7 @@ export const mockRecipes: Recipe[] = [
       "Shredded cabbage, carrot, peppers, and chickpeas tossed in a tahini-lime dressing.",
     emoji: "🥗",
     mealTypes: ["lunch"],
-    tags: ["vegan", "vegetarian", "quick", "gluten-free"],
+    tags: ["vegan", "vegetarian", "quick", "gluten-free", "dairy-free"],
     dietaryStyles: ["vegan", "vegetarian", "pescatarian", "omnivore"],
     prepMinutes: 15,
     cookMinutes: 0,
@@ -173,13 +185,44 @@ export const mockRecipes: Recipe[] = [
     ],
   },
   {
+    id: "smoked-salmon-salad",
+    title: "Smoked Salmon & Dill Salad",
+    description:
+      "Silky smoked salmon over crisp greens with capers, cucumber, and a bright lemon dressing.",
+    emoji: "🐠",
+    mealTypes: ["lunch"],
+    tags: ["pescatarian", "high-protein", "quick", "gluten-free", "dairy-free"],
+    dietaryStyles: ["pescatarian", "omnivore"],
+    prepMinutes: 10,
+    cookMinutes: 0,
+    servings: 2,
+    nutrition: { calories: 340, protein: 28, carbs: 12, fat: 21 },
+    ingredients: [
+      { id: "smoked-salmon", name: "Smoked salmon", quantity: "200 g", category: "protein" },
+      { id: "mixed-greens", name: "Mixed salad greens", quantity: "150 g", category: "produce" },
+      { id: "cucumber-4", name: "Cucumber", quantity: "1", category: "produce" },
+      { id: "capers", name: "Capers", quantity: "2 tbsp", category: "pantry" },
+      { id: "red-onion-2", name: "Red onion", quantity: "¼", category: "produce" },
+      { id: "dill", name: "Fresh dill", quantity: "1 small bunch", category: "produce" },
+      { id: "lemon-4", name: "Lemon", quantity: "1", category: "produce" },
+      { id: "olive-oil-3", name: "Olive oil", quantity: "2 tbsp", category: "pantry" },
+    ],
+    steps: [
+      { id: "s1", instruction: "Wash and dry the salad greens, then divide between two plates." },
+      { id: "s2", instruction: "Thinly slice the cucumber and red onion." },
+      { id: "s3", instruction: "Whisk olive oil, lemon juice, and a pinch of salt into a light dressing." },
+      { id: "s4", instruction: "Arrange the smoked salmon, cucumber, and red onion over the greens." },
+      { id: "s5", instruction: "Scatter with capers and dill, then drizzle with the dressing." },
+    ],
+  },
+  {
     id: "curried-lentil-soup",
     title: "Curried Lentil Soup",
     description:
       "A creamy, warming coconut-curry lentil soup that comes together in one pot.",
     emoji: "🍲",
     mealTypes: ["lunch"],
-    tags: ["vegan", "vegetarian", "gluten-free", "comfort"],
+    tags: ["vegan", "vegetarian", "gluten-free", "comfort", "dairy-free"],
     dietaryStyles: ["vegan", "vegetarian", "pescatarian", "omnivore"],
     prepMinutes: 10,
     cookMinutes: 25,
@@ -209,7 +252,7 @@ export const mockRecipes: Recipe[] = [
       "Glazed salmon fillets with sticky rice and charred broccoli. Weeknight favorite.",
     emoji: "🍣",
     mealTypes: ["dinner"],
-    tags: ["high-protein"],
+    tags: ["pescatarian", "high-protein", "dairy-free"],
     dietaryStyles: ["pescatarian", "omnivore"],
     prepMinutes: 10,
     cookMinutes: 20,
@@ -238,7 +281,7 @@ export const mockRecipes: Recipe[] = [
       "Crisp vegetables and tofu flash-fried in a ginger-garlic sauce over noodles.",
     emoji: "🥦",
     mealTypes: ["dinner"],
-    tags: ["vegan", "vegetarian", "quick"],
+    tags: ["vegan", "vegetarian", "quick", "high-protein", "dairy-free"],
     dietaryStyles: ["vegan", "vegetarian", "pescatarian", "omnivore"],
     prepMinutes: 10,
     cookMinutes: 10,
@@ -267,7 +310,7 @@ export const mockRecipes: Recipe[] = [
       "Flaked tuna over lemony quinoa with cherry tomatoes, olives, and feta — bright, fast, and filling.",
     emoji: "🐟",
     mealTypes: ["dinner"],
-    tags: ["high-protein", "gluten-free", "quick"],
+    tags: ["pescatarian", "high-protein", "quick", "gluten-free"],
     dietaryStyles: ["pescatarian", "omnivore"],
     prepMinutes: 15,
     cookMinutes: 5,
@@ -299,7 +342,7 @@ export const mockRecipes: Recipe[] = [
       "Creamy hummus with crunchy vegetables and warm pita — the ideal afternoon snack.",
     emoji: "🥕",
     mealTypes: ["snack"],
-    tags: ["vegan", "vegetarian", "quick"],
+    tags: ["vegan", "vegetarian", "quick", "dairy-free"],
     dietaryStyles: ["vegan", "vegetarian", "pescatarian", "omnivore"],
     prepMinutes: 5,
     cookMinutes: 0,
@@ -322,7 +365,7 @@ export const mockRecipes: Recipe[] = [
     description: "Crisp apple slices with a generous swipe of almond butter and cinnamon.",
     emoji: "🍎",
     mealTypes: ["snack"],
-    tags: ["vegan", "vegetarian", "quick", "gluten-free"],
+    tags: ["vegan", "vegetarian", "quick", "gluten-free", "dairy-free"],
     dietaryStyles: ["vegan", "vegetarian", "pescatarian", "omnivore"],
     prepMinutes: 3,
     cookMinutes: 0,
@@ -343,7 +386,7 @@ export const mockRecipes: Recipe[] = [
     description: "Crunchy, smoky roasted chickpeas — a snack that actually keeps you full.",
     emoji: "🫘",
     mealTypes: ["snack"],
-    tags: ["vegan", "vegetarian", "gluten-free", "quick"],
+    tags: ["vegan", "vegetarian", "gluten-free", "dairy-free"],
     dietaryStyles: ["vegan", "vegetarian", "pescatarian", "omnivore"],
     prepMinutes: 5,
     cookMinutes: 25,
@@ -365,7 +408,8 @@ export const mockRecipes: Recipe[] = [
 
 /**
  * Weekly rotation used to build the mock plan. Index = day of week (0 = Sunday).
- * Each slot uses four distinct recipes so a full week never repeats a meal.
+ * Each slot uses four distinct recipes, and no day repeats a recipe across
+ * two meal slots (e.g. lunch never matches that day's breakfast).
  */
 export const weeklyRotation: Record<string, [string, string, string, string]> = {
   breakfast: [
@@ -377,7 +421,7 @@ export const weeklyRotation: Record<string, [string, string, string, string]> = 
   lunch: [
     "rainbow-salad",
     "chicken-grain-bowl",
-    "avocado-toast",
+    "smoked-salmon-salad",
     "curried-lentil-soup",
   ] as [string, string, string, string],
   dinner: [
@@ -407,6 +451,8 @@ export const mockGroceryItems: GroceryItem[] = [
   { id: "g-ginger", name: "Fresh ginger", quantity: "1 piece", category: "produce" },
   { id: "g-cherry-tomatoes", name: "Cherry tomatoes", quantity: "200 g", category: "produce" },
   { id: "g-red-onion", name: "Red onion", quantity: "2", category: "produce" },
+  { id: "g-salad-greens", name: "Mixed salad greens", quantity: "150 g", category: "produce" },
+  { id: "g-dill", name: "Fresh dill", quantity: "1 bunch", category: "produce" },
   {
     id: "g-chicken",
     name: "Chicken thighs",
@@ -418,6 +464,13 @@ export const mockGroceryItems: GroceryItem[] = [
     id: "g-salmon",
     name: "Salmon fillets",
     quantity: "2",
+    category: "protein",
+    dietaryStyles: ["pescatarian", "omnivore"],
+  },
+  {
+    id: "g-smoked-salmon",
+    name: "Smoked salmon",
+    quantity: "200 g",
     category: "protein",
     dietaryStyles: ["pescatarian", "omnivore"],
   },
@@ -441,6 +494,7 @@ export const mockGroceryItems: GroceryItem[] = [
   { id: "g-lentils", name: "Red lentils", quantity: "500 g", category: "pantry" },
   { id: "g-chickpeas", name: "Chickpeas (cans)", quantity: "3", category: "pantry" },
   { id: "g-olives", name: "Kalamata olives", quantity: "1 jar", category: "pantry" },
+  { id: "g-capers", name: "Capers", quantity: "1 jar", category: "pantry" },
   { id: "g-coconut-milk", name: "Coconut milk", quantity: "2 cans", category: "pantry" },
   { id: "g-curry-powder", name: "Curry powder", quantity: "1 jar", category: "pantry" },
   { id: "g-tomatoes", name: "Chopped tomatoes (cans)", quantity: "3", category: "pantry" },

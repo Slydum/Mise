@@ -6,11 +6,14 @@ import { TagEditor } from "@/components/profile/tag-editor";
 import { ScreenHeader } from "@/components/screen-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Toast } from "@/components/ui/toast";
 import { getProfile } from "@/lib/data";
 import { useData } from "@/lib/hooks/use-data";
 import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useFavorites } from "@/lib/hooks/use-favorites";
 import { useFoodPreferences } from "@/lib/hooks/use-food-preferences";
+import { useToast } from "@/lib/hooks/use-toast";
+import type { DietaryStyle } from "@/lib/types";
 
 const SETTINGS = [
   { icon: Bell, label: "Notifications", hint: "Meal reminders" },
@@ -34,6 +37,18 @@ export function ProfileScreen() {
     removeFavorite,
   } = useFoodPreferences();
   const savedCount = Object.keys(favorites).length;
+  const { message: toastMessage, showToast } = useToast();
+
+  const handleDietChange = (style: DietaryStyle) => {
+    setDietaryStyle(style);
+    showToast("Saved");
+  };
+  const withToast =
+    <T,>(fn: (value: T) => void) =>
+    (value: T) => {
+      fn(value);
+      showToast("Saved");
+    };
 
   return (
     <div className="flex flex-col gap-6 animate-fade-up">
@@ -83,7 +98,7 @@ export function ProfileScreen() {
                 <CardTitle className="font-serif text-xl font-normal">Eating style</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <DietStyleSelector value={dietaryStyle} onChange={setDietaryStyle} />
+                <DietStyleSelector value={dietaryStyle} onChange={handleDietChange} />
               </CardContent>
             </Card>
 
@@ -94,8 +109,8 @@ export function ProfileScreen() {
               <CardContent>
                 <TagEditor
                   values={allergies}
-                  onAdd={addAllergy}
-                  onRemove={removeAllergy}
+                  onAdd={withToast(addAllergy)}
+                  onRemove={withToast(removeAllergy)}
                   placeholder="e.g. peanuts"
                   emptyHint="No allergies added. We'll warn you before you open a recipe that contains one."
                   chipVariant="warning"
@@ -110,8 +125,8 @@ export function ProfileScreen() {
               <CardContent>
                 <TagEditor
                   values={excludedIngredients}
-                  onAdd={addExcluded}
-                  onRemove={removeExcluded}
+                  onAdd={withToast(addExcluded)}
+                  onRemove={withToast(removeExcluded)}
                   placeholder="e.g. cilantro"
                   emptyHint="Nothing excluded. Add ingredients you'd rather not see suggested."
                 />
@@ -125,8 +140,8 @@ export function ProfileScreen() {
               <CardContent>
                 <TagEditor
                   values={favoriteIngredients}
-                  onAdd={addFavorite}
-                  onRemove={removeFavorite}
+                  onAdd={withToast(addFavorite)}
+                  onRemove={withToast(removeFavorite)}
                   placeholder="e.g. salmon"
                   emptyHint="Add ingredients you love and we'll prioritize recipes that use them."
                 />
@@ -193,6 +208,8 @@ export function ProfileScreen() {
           <p className="pb-2 text-center text-xs text-muted-foreground">Mise v0.3.0</p>
         </div>
       )}
+
+      <Toast message={toastMessage} />
     </div>
   );
 }

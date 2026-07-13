@@ -53,6 +53,7 @@ export function MealCard({ recipe, mealType, completed = false, onToggleComplete
             checked={completed}
             onCheckedChange={onToggleCompleted}
             aria-label={completed ? `Mark ${recipe.title} as not eaten` : `Mark ${recipe.title} as eaten`}
+            className="size-7"
           />
         </span>
       ) : null}

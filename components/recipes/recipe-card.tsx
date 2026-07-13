@@ -31,7 +31,7 @@ export function RecipeCard({ recipe, favorited, onToggleFavorite, dietaryStyle }
           recipe={recipe}
           aspect="portrait"
           rounded="rounded-3xl"
-          emojiClassName="text-5xl"
+          emojiClassName="text-6xl"
           className="shadow-soft transition-transform duration-200 group-active:scale-[0.97]"
         />
         <FavoriteButton

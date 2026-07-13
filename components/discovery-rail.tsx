@@ -15,18 +15,18 @@ export function DiscoveryRail({ title, recipes, className }: DiscoveryRailProps)
   return (
     <section aria-label={title} className={className}>
       <h2 className="mb-3 px-5 font-serif text-2xl">{title}</h2>
-      <div className="flex gap-4 overflow-x-auto px-5 pb-1 no-scrollbar">
+      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-3 no-scrollbar">
         {recipes.map((recipe) => (
           <Link
             key={recipe.id}
             href={`/recipes/${recipe.id}`}
-            className="w-36 shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-3xl"
+            className="w-36 shrink-0 snap-start outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-3xl"
           >
             <FoodCover
               recipe={recipe}
               aspect="portrait"
               rounded="rounded-3xl"
-              emojiClassName="text-4xl"
+              emojiClassName="text-5xl"
               className="shadow-soft transition-transform duration-200 active:scale-[0.96]"
             />
             <p className="mt-2 line-clamp-2 min-h-[2.75rem] font-serif text-base leading-snug">
@@ -34,6 +34,8 @@ export function DiscoveryRail({ title, recipes, className }: DiscoveryRailProps)
             </p>
           </Link>
         ))}
+        {/* Guarantees end padding beyond the last card even as flex sizing rounds. */}
+        <div aria-hidden className="w-2 shrink-0" />
       </div>
     </section>
   );

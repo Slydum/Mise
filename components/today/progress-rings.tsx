@@ -23,7 +23,7 @@ export function ProgressRings({
   onAddWater,
 }: ProgressRingsProps) {
   return (
-    <section aria-label="Today's progress" className="flex justify-center gap-6 px-5 py-2">
+    <section aria-label="Today's progress" className="flex justify-center gap-6 px-5">
       <ProgressRing
         value={calories}
         max={caloriesGoal}

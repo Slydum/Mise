@@ -71,17 +71,23 @@ export interface RecipeStep {
 export type RecipeTag =
   | "vegetarian"
   | "vegan"
+  | "pescatarian"
   | "high-protein"
   | "quick"
   | "gluten-free"
+  | "dairy-free"
+  | "contains-eggs"
   | "comfort";
 
 export const RECIPE_TAG_LABELS: Record<RecipeTag, string> = {
   vegetarian: "Vegetarian",
   vegan: "Vegan",
+  pescatarian: "Pescatarian",
   "high-protein": "High protein",
   quick: "Under 20 min",
   "gluten-free": "Gluten-free",
+  "dairy-free": "Dairy-free",
+  "contains-eggs": "Contains eggs",
   comfort: "Comfort",
 };
 

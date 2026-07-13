@@ -21,7 +21,7 @@ export function RecipeHero({ recipe }: RecipeHeroProps) {
         recipe={recipe}
         aspect="hero"
         rounded="rounded-none"
-        emojiClassName="text-7xl"
+        emojiClassName="text-8xl"
         className="w-full"
       />
       <Link
