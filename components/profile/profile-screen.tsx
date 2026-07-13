@@ -1,12 +1,16 @@
 "use client";
 
 import { Bell, ChevronRight, CloudOff, Heart, Ruler, Palette } from "lucide-react";
+import { DietStyleSelector } from "@/components/profile/diet-style-selector";
+import { TagEditor } from "@/components/profile/tag-editor";
 import { ScreenHeader } from "@/components/screen-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProfile } from "@/lib/data";
 import { useData } from "@/lib/hooks/use-data";
+import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useFavorites } from "@/lib/hooks/use-favorites";
+import { useFoodPreferences } from "@/lib/hooks/use-food-preferences";
 
 const SETTINGS = [
   { icon: Bell, label: "Notifications", hint: "Meal reminders" },
@@ -17,6 +21,18 @@ const SETTINGS = [
 export function ProfileScreen() {
   const profile = useData(getProfile);
   const { favorites } = useFavorites();
+  const { dietaryStyle, setDietaryStyle } = useDietaryStyle();
+  const {
+    allergies,
+    excludedIngredients,
+    favoriteIngredients,
+    addAllergy,
+    removeAllergy,
+    addExcluded,
+    removeExcluded,
+    addFavorite,
+    removeFavorite,
+  } = useFoodPreferences();
   const savedCount = Object.keys(favorites).length;
 
   return (
@@ -59,31 +75,94 @@ export function ProfileScreen() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-serif text-xl font-normal">Daily goals</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
-                <div className="rounded-2xl bg-muted/60 p-3">
-                  <dt className="text-xs font-medium text-muted-foreground">Calories</dt>
-                  <dd className="text-lg font-semibold">{profile.goals.calories.toLocaleString()}</dd>
-                </div>
-                <div className="rounded-2xl bg-muted/60 p-3">
-                  <dt className="text-xs font-medium text-muted-foreground">Protein</dt>
-                  <dd className="text-lg font-semibold">{profile.goals.protein} g</dd>
-                </div>
-                <div className="rounded-2xl bg-muted/60 p-3">
-                  <dt className="text-xs font-medium text-muted-foreground">Carbs</dt>
-                  <dd className="text-lg font-semibold">{profile.goals.carbs} g</dd>
-                </div>
-                <div className="rounded-2xl bg-muted/60 p-3">
-                  <dt className="text-xs font-medium text-muted-foreground">Fat</dt>
-                  <dd className="text-lg font-semibold">{profile.goals.fat} g</dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
+          <section className="flex flex-col gap-4">
+            <h2 className="px-1 font-serif text-2xl">Food Preferences</h2>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-serif text-xl font-normal">Eating style</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <DietStyleSelector value={dietaryStyle} onChange={setDietaryStyle} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-serif text-xl font-normal">Allergies</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TagEditor
+                  values={allergies}
+                  onAdd={addAllergy}
+                  onRemove={removeAllergy}
+                  placeholder="e.g. peanuts"
+                  emptyHint="No allergies added. We'll warn you before you open a recipe that contains one."
+                  chipVariant="warning"
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-serif text-xl font-normal">Excluded ingredients</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TagEditor
+                  values={excludedIngredients}
+                  onAdd={addExcluded}
+                  onRemove={removeExcluded}
+                  placeholder="e.g. cilantro"
+                  emptyHint="Nothing excluded. Add ingredients you'd rather not see suggested."
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-serif text-xl font-normal">Favorite ingredients</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TagEditor
+                  values={favoriteIngredients}
+                  onAdd={addFavorite}
+                  onRemove={removeFavorite}
+                  placeholder="e.g. salmon"
+                  emptyHint="Add ingredients you love and we'll prioritize recipes that use them."
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-serif text-xl font-normal">Daily goals</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <div className="rounded-2xl bg-muted/60 p-3">
+                    <dt className="text-xs font-medium text-muted-foreground">Calories</dt>
+                    <dd className="text-lg font-semibold">{profile.goals.calories.toLocaleString()}</dd>
+                  </div>
+                  <div className="rounded-2xl bg-muted/60 p-3">
+                    <dt className="text-xs font-medium text-muted-foreground">Protein</dt>
+                    <dd className="text-lg font-semibold">{profile.goals.protein} g</dd>
+                  </div>
+                  <div className="rounded-2xl bg-muted/60 p-3">
+                    <dt className="text-xs font-medium text-muted-foreground">Carbs</dt>
+                    <dd className="text-lg font-semibold">{profile.goals.carbs} g</dd>
+                  </div>
+                  <div className="rounded-2xl bg-muted/60 p-3">
+                    <dt className="text-xs font-medium text-muted-foreground">Fat</dt>
+                    <dd className="text-lg font-semibold">{profile.goals.fat} g</dd>
+                  </div>
+                  <div className="col-span-2 rounded-2xl bg-muted/60 p-3">
+                    <dt className="text-xs font-medium text-muted-foreground">Water</dt>
+                    <dd className="text-lg font-semibold">{(profile.waterGoalMl / 1000).toFixed(1)} L</dd>
+                  </div>
+                </dl>
+              </CardContent>
+            </Card>
+          </section>
 
           <Card>
             <CardContent className="p-2">
@@ -111,7 +190,7 @@ export function ProfileScreen() {
             </CardContent>
           </Card>
 
-          <p className="pb-2 text-center text-xs text-muted-foreground">Mise v0.2.0</p>
+          <p className="pb-2 text-center text-xs text-muted-foreground">Mise v0.3.0</p>
         </div>
       )}
     </div>

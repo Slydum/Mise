@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Check } from "lucide-react";
 import { FoodCover } from "@/components/food-cover";
 import { MealTypeEyebrow } from "@/components/meal-type-eyebrow";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { MealType, Recipe } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -17,8 +17,8 @@ interface MealCardProps {
 
 /**
  * A single row in a meal menu: cover thumbnail, meal-type eyebrow, recipe
- * title, and an optional tap-to-check "eaten" toggle. Used on Today's Menu
- * and the Plan screen.
+ * title, and an optional "eaten" checkbox. Used on Today's Menu and the
+ * Plan screen.
  */
 export function MealCard({ recipe, mealType, completed = false, onToggleCompleted, className }: MealCardProps) {
   return (
@@ -34,11 +34,11 @@ export function MealCard({ recipe, mealType, completed = false, onToggleComplete
           emojiClassName="text-2xl"
           className="size-14 shrink-0 shadow-soft"
         />
-        <span className="min-w-0">
+        <span className="min-w-0 flex-1">
           <MealTypeEyebrow mealType={mealType} />
           <span
             className={cn(
-              "block truncate font-serif text-lg leading-snug",
+              "block line-clamp-2 font-serif text-lg leading-snug",
               completed && "text-muted-foreground line-through decoration-muted-foreground/60",
             )}
           >
@@ -48,20 +48,13 @@ export function MealCard({ recipe, mealType, completed = false, onToggleComplete
       </Link>
 
       {onToggleCompleted ? (
-        <button
-          type="button"
-          onClick={onToggleCompleted}
-          aria-label={completed ? `Mark ${recipe.title} as not eaten` : `Mark ${recipe.title} as eaten`}
-          aria-pressed={completed}
-          className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-90",
-            completed
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border bg-card text-transparent",
-          )}
-        >
-          <Check className="size-4" strokeWidth={3} aria-hidden />
-        </button>
+        <span className="flex size-11 shrink-0 items-center justify-center">
+          <Checkbox
+            checked={completed}
+            onCheckedChange={onToggleCompleted}
+            aria-label={completed ? `Mark ${recipe.title} as not eaten` : `Mark ${recipe.title} as eaten`}
+          />
+        </span>
       ) : null}
     </div>
   );

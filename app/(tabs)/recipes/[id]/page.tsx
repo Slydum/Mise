@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChefHat, Clock, Users } from "lucide-react";
+import { DietWarning } from "@/components/recipes/diet-warning";
 import { IngredientChecklist } from "@/components/recipes/ingredient-checklist";
 import { RecipeHero } from "@/components/recipes/recipe-hero";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,7 @@ export async function generateMetadata({ params }: RecipePageProps): Promise<Met
 
 export default async function RecipePage({ params }: RecipePageProps) {
   const { id } = await params;
-  const recipe = await getRecipe(id);
+  const [recipe, allRecipes] = await Promise.all([getRecipe(id), getRecipes()]);
   if (!recipe) notFound();
 
   const nutritionChips = [
@@ -64,6 +65,8 @@ export default async function RecipePage({ params }: RecipePageProps) {
             </div>
           ) : null}
         </header>
+
+        <DietWarning recipe={recipe} allRecipes={allRecipes} />
 
         <Button asChild variant="highlight" size="lg" className="w-full">
           <Link href={`/cook/${recipe.id}`}>

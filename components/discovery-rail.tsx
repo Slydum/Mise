@@ -29,7 +29,9 @@ export function DiscoveryRail({ title, recipes, className }: DiscoveryRailProps)
               emojiClassName="text-4xl"
               className="shadow-soft transition-transform duration-200 active:scale-[0.96]"
             />
-            <p className="mt-2 line-clamp-2 font-serif text-base leading-snug">{recipe.title}</p>
+            <p className="mt-2 line-clamp-2 min-h-[2.75rem] font-serif text-base leading-snug">
+              {recipe.title}
+            </p>
           </Link>
         ))}
       </div>

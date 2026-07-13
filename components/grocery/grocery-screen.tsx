@@ -9,8 +9,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getGroceryList } from "@/lib/data";
 import { loadCheckedItems, saveCheckedItems } from "@/lib/data/local-store";
 import { useData } from "@/lib/hooks/use-data";
+import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import type { GroceryCategory, GroceryItem } from "@/lib/types";
-import { GROCERY_CATEGORY_LABELS, GROCERY_CATEGORY_ORDER } from "@/lib/types";
+import { DIETARY_STYLE_LABELS, GROCERY_CATEGORY_LABELS, GROCERY_CATEGORY_ORDER } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_EMOJI: Record<GroceryCategory, string> = {
@@ -24,7 +25,13 @@ const CATEGORY_EMOJI: Record<GroceryCategory, string> = {
 };
 
 export function GroceryScreen() {
-  const items = useData(getGroceryList);
+  const allItems = useData(getGroceryList);
+  const { dietaryStyle } = useDietaryStyle();
+  const items = useMemo(
+    () =>
+      allItems?.filter((item) => !item.dietaryStyles || item.dietaryStyles.includes(dietaryStyle)),
+    [allItems, dietaryStyle],
+  );
   const [checked, setChecked] = useState<Record<string, boolean>>({});
 
   // Persisted state is client-only; hydrate after mount.
@@ -65,7 +72,7 @@ export function GroceryScreen() {
 
   return (
     <div className="flex flex-col gap-6 animate-fade-up">
-      <ScreenHeader title="Grocery" subtitle="This week's shop">
+      <ScreenHeader title="Grocery" subtitle={`This week's shop · ${DIETARY_STYLE_LABELS[dietaryStyle]}`}>
         {anyChecked ? (
           <Button variant="ghost" size="sm" onClick={clearChecked} className="text-muted-foreground">
             Clear

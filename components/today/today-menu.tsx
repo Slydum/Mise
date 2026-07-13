@@ -17,10 +17,11 @@ interface TodayMenuProps {
   entries: TodayMenuEntry[];
   onToggle: (mealId: string) => void;
   onAddSlot: (mealType: MealType) => void;
+  onQuickAdd: () => void;
 }
 
 /** Today's meals as one continuous, editorial menu rather than a stack of stat cards. */
-export function TodayMenu({ entries, onToggle, onAddSlot }: TodayMenuProps) {
+export function TodayMenu({ entries, onToggle, onAddSlot, onQuickAdd }: TodayMenuProps) {
   const byType = new Map<MealType, TodayMenuEntry[]>();
   for (const entry of entries) {
     byType.set(entry.mealType, [...(byType.get(entry.mealType) ?? []), entry]);
@@ -28,7 +29,17 @@ export function TodayMenu({ entries, onToggle, onAddSlot }: TodayMenuProps) {
 
   return (
     <section aria-label="Today's menu" className="px-5">
-      <h2 className="mb-3 font-serif text-2xl">Today&apos;s Menu</h2>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="font-serif text-2xl">Today&apos;s Menu</h2>
+        <button
+          type="button"
+          onClick={onQuickAdd}
+          aria-label="Quick add a meal"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-highlight text-highlight-foreground shadow-soft transition-transform duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-90"
+        >
+          <Plus className="size-4.5" aria-hidden />
+        </button>
+      </div>
       <div className="divide-y divide-border/60 rounded-3xl border border-border/60 bg-card px-5 shadow-soft">
         {MEAL_TYPES.map((mealType) => {
           const mealEntries = byType.get(mealType) ?? [];

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getRecipes } from "@/lib/data";
 import { useData } from "@/lib/hooks/use-data";
+import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useFavorites } from "@/lib/hooks/use-favorites";
 import type { MealType, Recipe, RecipeTag } from "@/lib/types";
 import { MEAL_TYPE_LABELS, RECIPE_TAG_LABELS } from "@/lib/types";
@@ -47,6 +48,7 @@ function matches(recipe: Recipe, filter: Filter, query: string, favorites: Recor
 export function RecipesScreen() {
   const recipes = useData(getRecipes);
   const { favorites, setFavorite } = useFavorites();
+  const { dietaryStyle } = useDietaryStyle();
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
 
@@ -124,6 +126,7 @@ export function RecipesScreen() {
                 recipe={recipe}
                 favorited={Boolean(favorites[recipe.id])}
                 onToggleFavorite={(active) => setFavorite(recipe.id, active)}
+                dietaryStyle={dietaryStyle}
               />
             </li>
           ))}

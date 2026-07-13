@@ -28,7 +28,7 @@ export function ContinueCooking({ recipe, stepIndex }: ContinueCookingProps) {
             <ChefHat className="size-3.5" aria-hidden />
             Continue cooking
           </p>
-          <p className="truncate font-serif text-lg text-highlight-tint-foreground">
+          <p className="line-clamp-2 font-serif text-lg leading-snug text-highlight-tint-foreground">
             {recipe.title}
           </p>
           <p className="text-xs text-highlight-tint-foreground/70">

@@ -85,6 +85,32 @@ export const RECIPE_TAG_LABELS: Record<RecipeTag, string> = {
   comfort: "Comfort",
 };
 
+/**
+ * Eating styles a recipe can satisfy. Not mutually exclusive: a vegan recipe
+ * also satisfies vegetarian, pescatarian, and omnivore, so it lists all four.
+ * A chicken recipe satisfies only omnivore; a fish recipe satisfies
+ * pescatarian and omnivore but not vegetarian/vegan.
+ */
+export type DietaryStyle = "omnivore" | "pescatarian" | "vegetarian" | "vegan";
+
+export const DIETARY_STYLES: DietaryStyle[] = ["omnivore", "pescatarian", "vegetarian", "vegan"];
+
+export const DIETARY_STYLE_LABELS: Record<DietaryStyle, string> = {
+  omnivore: "Omnivore",
+  pescatarian: "Pescatarian",
+  vegetarian: "Vegetarian",
+  vegan: "Vegan",
+};
+
+export const DIETARY_STYLE_DESCRIPTIONS: Record<DietaryStyle, string> = {
+  omnivore: "Eats everything, including meat and fish",
+  pescatarian: "Fish and seafood, no other meat",
+  vegetarian: "No meat or fish; dairy and eggs OK",
+  vegan: "No animal products at all",
+};
+
+export const DEFAULT_DIETARY_STYLE: DietaryStyle = "pescatarian";
+
 export interface Recipe {
   id: string;
   title: string;
@@ -95,6 +121,8 @@ export interface Recipe {
   imageUrl?: string;
   mealTypes: MealType[];
   tags: RecipeTag[];
+  /** Eating styles this recipe satisfies (see DietaryStyle). */
+  dietaryStyles: DietaryStyle[];
   prepMinutes: number;
   cookMinutes: number;
   servings: number;
@@ -121,6 +149,8 @@ export interface GroceryItem {
   name: string;
   quantity: string;
   category: GroceryCategory;
+  /** Eating styles this item is compatible with. Omitted means diet-agnostic (produce, pantry, etc). */
+  dietaryStyles?: DietaryStyle[];
 }
 
 /** An ingredient the user already has on hand that's nearing its use-by point. */
@@ -136,4 +166,6 @@ export interface UserProfile {
   goals: Nutrition;
   /** Daily hydration goal, in milliliters. */
   waterGoalMl: number;
+  /** Default eating style; the user's actual current choice lives in local-store and can override this. */
+  dietaryStyle: DietaryStyle;
 }

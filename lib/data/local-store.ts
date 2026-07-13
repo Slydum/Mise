@@ -1,4 +1,5 @@
-import type { MealType, PlannedMeal } from "@/lib/types";
+import type { DietaryStyle, MealType, PlannedMeal } from "@/lib/types";
+import { DEFAULT_DIETARY_STYLE } from "@/lib/types";
 
 /**
  * Lightweight client-side persistence for user actions (checked grocery
@@ -15,6 +16,10 @@ const KEYS = {
   water: "mise.water.v1",
   activeCook: "mise.cook.active.v1",
   ingredientChecks: "mise.recipe.ingredients.v1",
+  dietaryStyle: "mise.profile.dietaryStyle.v1",
+  allergies: "mise.profile.allergies.v1",
+  excludedIngredients: "mise.profile.excludedIngredients.v1",
+  favoriteIngredients: "mise.profile.favoriteIngredients.v1",
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -139,4 +144,38 @@ export function saveIngredientChecks(recipeId: string, map: Record<string, boole
   const all = read<IngredientChecksByRecipe>(KEYS.ingredientChecks, {});
   all[recipeId] = map;
   write(KEYS.ingredientChecks, all);
+}
+
+// Food preferences --------------------------------------------------------------
+
+export function loadDietaryStyle(): DietaryStyle {
+  return read(KEYS.dietaryStyle, DEFAULT_DIETARY_STYLE);
+}
+
+export function saveDietaryStyle(style: DietaryStyle): void {
+  write(KEYS.dietaryStyle, style);
+}
+
+export function loadAllergies(): string[] {
+  return read(KEYS.allergies, []);
+}
+
+export function saveAllergies(values: string[]): void {
+  write(KEYS.allergies, values);
+}
+
+export function loadExcludedIngredients(): string[] {
+  return read(KEYS.excludedIngredients, []);
+}
+
+export function saveExcludedIngredients(values: string[]): void {
+  write(KEYS.excludedIngredients, values);
+}
+
+export function loadFavoriteIngredients(): string[] {
+  return read(KEYS.favoriteIngredients, []);
+}
+
+export function saveFavoriteIngredients(values: string[]): void {
+  write(KEYS.favoriteIngredients, values);
 }

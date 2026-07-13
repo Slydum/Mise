@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
 import { ContinueCooking } from "@/components/today/continue-cooking";
 import { GroceryReminder } from "@/components/today/grocery-reminder";
 import { ProgressRings } from "@/components/today/progress-rings";
@@ -31,6 +30,8 @@ import {
 } from "@/lib/data/local-store";
 import { greeting, todayKey } from "@/lib/dates";
 import { useData } from "@/lib/hooks/use-data";
+import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
+import { useFoodPreferences } from "@/lib/hooks/use-food-preferences";
 import type { MealType, Nutrition, PlannedMeal, Recipe, UseSoonItem } from "@/lib/types";
 
 const EMPTY_NUTRITION: Nutrition = { calories: 0, protein: 0, carbs: 0, fat: 0 };
@@ -40,11 +41,13 @@ export function TodayScreen() {
   // Date is resolved on the client so the statically cached page never
   // shows a stale day.
   const [dateKey] = useState(todayKey);
+  const { dietaryStyle } = useDietaryStyle();
+  const { allergies, excludedIngredients, favoriteIngredients } = useFoodPreferences();
 
   const recipes = useData(getRecipes);
   const profile = useData(getProfile);
   const groceryList = useData(getGroceryList);
-  const loadPlan = useCallback(() => getDayPlan(dateKey), [dateKey]);
+  const loadPlan = useCallback(() => getDayPlan(dateKey, dietaryStyle), [dateKey, dietaryStyle]);
   const plan = useData(loadPlan);
   const loadUseSoon = useCallback(() => getUseSoonIngredients(), []);
   const useSoon = useData(loadUseSoon);
@@ -89,9 +92,21 @@ export function TodayScreen() {
     () => Array.from(new Set(allMeals.map((m) => m.recipeId))),
     [allMeals],
   );
+  const avoidTerms = useMemo(
+    () => [...allergies, ...excludedIngredients],
+    [allergies, excludedIngredients],
+  );
   const loadSuggested = useCallback(
-    () => getSuggestedRecipes(plannedRecipeIds, dateKey, 6),
-    [plannedRecipeIds, dateKey],
+    () =>
+      getSuggestedRecipes(
+        plannedRecipeIds,
+        dateKey,
+        6,
+        dietaryStyle,
+        avoidTerms,
+        favoriteIngredients,
+      ),
+    [plannedRecipeIds, dateKey, dietaryStyle, avoidTerms, favoriteIngredients],
   );
   const suggested = useData(loadSuggested);
 
@@ -132,7 +147,7 @@ export function TodayScreen() {
   const loading = !plan || !recipes || !profile;
 
   return (
-    <div className="flex flex-col gap-8 pb-2 pt-4 animate-fade-up">
+    <div className="flex flex-col gap-8 pb-6 pt-4 animate-fade-up">
       <header className="px-5">
         {/* Date and greeting are computed at render time, so the statically
             prerendered HTML can differ from the client — suppress the
@@ -153,6 +168,7 @@ export function TodayScreen() {
             entries={menuEntries}
             onToggle={toggleCompleted}
             onAddSlot={(mealType) => setQuickAdd({ open: true, mealType })}
+            onQuickAdd={() => setQuickAdd({ open: true })}
           />
 
           <ProgressRings
@@ -177,16 +193,6 @@ export function TodayScreen() {
         </>
       )}
 
-      <button
-        type="button"
-        onClick={() => setQuickAdd({ open: true })}
-        aria-label="Quick add a meal"
-        className="fixed bottom-24 right-5 z-30 flex size-14 items-center justify-center rounded-full bg-highlight text-highlight-foreground shadow-lift transition-transform duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-90"
-        style={{ marginBottom: "env(safe-area-inset-bottom)" }}
-      >
-        <Plus className="size-7" aria-hidden />
-      </button>
-
       <QuickAddSheet
         open={quickAdd.open}
         onOpenChange={(open) => setQuickAdd((prev) => ({ ...prev, open }))}
@@ -201,10 +207,10 @@ function TodaySkeleton() {
   return (
     <div className="flex flex-col gap-8 px-5" aria-hidden>
       <Skeleton className="h-64 rounded-3xl" />
-      <div className="flex justify-center gap-7">
-        <Skeleton className="size-[92px] rounded-full" />
-        <Skeleton className="size-[92px] rounded-full" />
-        <Skeleton className="size-[92px] rounded-full" />
+      <div className="flex justify-center gap-6">
+        <Skeleton className="size-[100px] rounded-full" />
+        <Skeleton className="size-[100px] rounded-full" />
+        <Skeleton className="size-[100px] rounded-full" />
       </div>
       <Skeleton className="h-24 rounded-3xl" />
     </div>
