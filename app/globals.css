@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+@theme {
+  /* Warm, minimal palette: off-white canvas, sage accents, soft warm neutrals */
+  --color-background: #faf8f3;
+  --color-foreground: #2b2925;
+
+  --color-card: #ffffff;
+  --color-card-foreground: #2b2925;
+
+  --color-muted: #f1ece2;
+  --color-muted-foreground: #85806f;
+
+  --color-primary: #7c8f6d; /* sage */
+  --color-primary-soft: #5f7252;
+  --color-primary-foreground: #ffffff;
+
+  --color-secondary: #efe9dd;
+  --color-secondary-foreground: #4a463e;
+
+  --color-accent: #e8eede; /* pale sage */
+  --color-accent-foreground: #45523b;
+
+  --color-destructive: #c05b4d;
+  --color-destructive-foreground: #ffffff;
+
+  --color-border: #ebe5d9;
+  --color-input: #ebe5d9;
+  --color-ring: #7c8f6d;
+
+  --font-sans:
+    ui-rounded, -apple-system, BlinkMacSystemFont, "SF Pro Rounded",
+    "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 2rem;
+
+  --animate-fade-up: fade-up 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) both;
+  --animate-fade-in: fade-in 0.25s ease-out both;
+  --animate-scale-in: scale-in 0.2s cubic-bezier(0.21, 1.02, 0.73, 1) both;
+  --animate-slide-up: slide-up 0.3s cubic-bezier(0.21, 1.02, 0.73, 1) both;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes slide-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+}
+
+/* iOS safe-area helpers */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Bottom padding that clears the fixed tab bar (64px) plus the home indicator */
+@utility pb-nav {
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+    touch-action: manipulation;
+  }
+
+  /* 16px inputs prevent iOS from auto-zooming on focus */
+  input,
+  select,
+  textarea {
+    font-size: 1rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
