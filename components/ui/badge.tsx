@@ -8,6 +8,7 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: "bg-accent text-accent-foreground",
+        highlight: "bg-highlight-tint text-highlight-tint-foreground",
         secondary: "bg-secondary text-secondary-foreground",
         muted: "bg-muted text-muted-foreground",
         outline: "border border-border text-muted-foreground",

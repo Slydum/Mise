@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Clock, Flame } from "lucide-react";
+import { FoodCover } from "@/components/food-cover";
 import {
   Sheet,
   SheetContent,
@@ -81,14 +82,15 @@ export function QuickAddSheet({ open, onOpenChange, initialMealType, onAdd }: Qu
                 }}
                 className="flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted"
               >
-                <span
-                  aria-hidden
-                  className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-accent text-2xl"
-                >
-                  {recipe.emoji}
-                </span>
+                <FoodCover
+                  recipe={recipe}
+                  aspect="square"
+                  rounded="rounded-2xl"
+                  emojiClassName="text-xl"
+                  className="size-12 shrink-0"
+                />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold">{recipe.title}</span>
+                  <span className="block truncate font-serif text-lg">{recipe.title}</span>
                   <span className="mt-0.5 flex items-center gap-3 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Clock className="size-3.5" aria-hidden />

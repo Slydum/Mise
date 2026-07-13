@@ -1,4 +1,4 @@
-import type { GroceryItem, Recipe, UserProfile } from "@/lib/types";
+import type { GroceryItem, Recipe, UseSoonItem, UserProfile } from "@/lib/types";
 
 /**
  * Mock content for Mise. This file is only imported by the data provider
@@ -330,7 +330,16 @@ export const mockGroceryItems: GroceryItem[] = [
   { id: "g-foil", name: "Aluminium foil", quantity: "1 roll", category: "other" },
 ];
 
+/** Curated stand-in for "what's about to expire" until real pantry tracking exists. */
+export const mockUseSoon: UseSoonItem[] = [
+  { id: "u-yogurt", name: "Greek yogurt", emoji: "🥛", daysLeft: 1 },
+  { id: "u-cucumber", name: "Cucumbers", emoji: "🥒", daysLeft: 2 },
+  { id: "u-salmon", name: "Salmon fillets", emoji: "🐟", daysLeft: 1 },
+  { id: "u-berries", name: "Mixed berries", emoji: "🫐", daysLeft: 3 },
+];
+
 export const mockProfile: UserProfile = {
   name: "Alex",
   goals: { calories: 2200, protein: 120, carbs: 250, fat: 75 },
+  waterGoalMl: 2000,
 };

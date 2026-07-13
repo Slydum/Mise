@@ -64,7 +64,7 @@ export function GroceryScreen() {
   const anyChecked = doneCount > 0;
 
   return (
-    <div className="flex flex-col gap-5 animate-fade-up">
+    <div className="flex flex-col gap-6 animate-fade-up">
       <ScreenHeader title="Grocery" subtitle="This week's shop">
         {anyChecked ? (
           <Button variant="ghost" size="sm" onClick={clearChecked} className="text-muted-foreground">
@@ -80,9 +80,9 @@ export function GroceryScreen() {
         </div>
       ) : (
         <>
-          <div className="mx-5 flex flex-col gap-2 rounded-3xl border border-border/60 bg-card p-5">
+          <div className="mx-5 flex flex-col gap-2 rounded-3xl border border-border/60 bg-card p-6 shadow-soft">
             <div className="flex items-baseline justify-between">
-              <p className="font-semibold">
+              <p className="font-serif text-lg">
                 {doneCount} of {total} items
               </p>
               <p className="text-sm text-muted-foreground">
@@ -95,14 +95,14 @@ export function GroceryScreen() {
             />
           </div>
 
-          <div className="flex flex-col gap-6 px-5">
+          <div className="flex flex-col gap-7 px-5">
             {sections.map(({ category, items: sectionItems }) => (
               <section key={category} aria-label={GROCERY_CATEGORY_LABELS[category]}>
                 <h2 className="mb-2 flex items-center gap-2 px-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   <span aria-hidden>{CATEGORY_EMOJI[category]}</span>
                   {GROCERY_CATEGORY_LABELS[category]}
                 </h2>
-                <ul className="overflow-hidden rounded-3xl border border-border/60 bg-card">
+                <ul className="overflow-hidden rounded-3xl border border-border/60 bg-card shadow-soft">
                   {sectionItems.map((item, index) => {
                     const isChecked = Boolean(checked[item.id]);
                     return (

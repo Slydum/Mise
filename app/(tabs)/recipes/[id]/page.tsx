@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChefHat, ChevronLeft, Clock, Flame, Users } from "lucide-react";
+import { ChefHat, Clock, Users } from "lucide-react";
+import { IngredientChecklist } from "@/components/recipes/ingredient-checklist";
+import { RecipeHero } from "@/components/recipes/recipe-hero";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRecipe, getRecipes } from "@/lib/data";
 import { RECIPE_TAG_LABELS } from "@/lib/types";
 
@@ -28,99 +29,85 @@ export default async function RecipePage({ params }: RecipePageProps) {
   const recipe = await getRecipe(id);
   if (!recipe) notFound();
 
-  const facts = [
-    { icon: Clock, label: `${recipe.prepMinutes + recipe.cookMinutes} min` },
-    { icon: Flame, label: `${recipe.nutrition.calories} cal` },
-    { icon: Users, label: `Serves ${recipe.servings}` },
+  const nutritionChips = [
+    { label: "Calories", value: recipe.nutrition.calories },
+    { label: "Protein", value: `${recipe.nutrition.protein}g` },
+    { label: "Carbs", value: `${recipe.nutrition.carbs}g` },
+    { label: "Fat", value: `${recipe.nutrition.fat}g` },
   ];
 
   return (
-    <div className="flex flex-col gap-5 animate-fade-up">
-      <div className="relative flex h-44 items-center justify-center bg-accent">
-        <span className="text-7xl" aria-hidden>
-          {recipe.emoji}
-        </span>
-        <Button
-          asChild
-          variant="outline"
-          size="icon"
-          className="absolute left-4 top-4 shadow-sm"
-        >
-          <Link href="/recipes" aria-label="Back to recipes">
-            <ChevronLeft aria-hidden />
-          </Link>
-        </Button>
-      </div>
+    <div className="flex flex-col gap-6 pb-2 animate-fade-up">
+      <RecipeHero recipe={recipe} />
 
-      <div className="flex flex-col gap-5 px-5">
-        <header className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight">{recipe.title}</h1>
-          <p className="text-muted-foreground">{recipe.description}</p>
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {recipe.tags.map((tag) => (
-              <Badge key={tag}>{RECIPE_TAG_LABELS[tag]}</Badge>
-            ))}
-          </div>
+      <div className="flex flex-col gap-6 px-5">
+        <header className="flex flex-col gap-2.5">
+          <h1 className="font-serif text-4xl leading-tight">{recipe.title}</h1>
+          <p className="flex items-center gap-3 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Clock className="size-4" aria-hidden />
+              {recipe.prepMinutes + recipe.cookMinutes} min
+            </span>
+            <span className="flex items-center gap-1">
+              <Users className="size-4" aria-hidden />
+              Serves {recipe.servings}
+            </span>
+          </p>
+          <p className="leading-relaxed text-foreground/80">{recipe.description}</p>
+          {recipe.tags.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {recipe.tags.map((tag) => (
+                <Badge key={tag} variant="outline">
+                  {RECIPE_TAG_LABELS[tag]}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
         </header>
 
-        <div className="grid grid-cols-3 gap-3" role="list" aria-label="Recipe facts">
-          {facts.map(({ icon: Icon, label }) => (
+        <Button asChild variant="highlight" size="lg" className="w-full">
+          <Link href={`/cook/${recipe.id}`}>
+            <ChefHat aria-hidden />
+            Cook
+          </Link>
+        </Button>
+
+        <div className="flex gap-2.5 overflow-x-auto no-scrollbar" role="list" aria-label="Nutrition per serving">
+          {nutritionChips.map(({ label, value }) => (
             <div
               key={label}
               role="listitem"
-              className="flex flex-col items-center gap-1 rounded-2xl bg-card border border-border/60 py-3"
+              className="flex shrink-0 flex-col items-center gap-0.5 rounded-2xl bg-accent px-5 py-3 text-accent-foreground"
             >
-              <Icon className="size-5 text-primary" aria-hidden />
-              <span className="text-sm font-semibold">{label}</span>
+              <span className="text-base font-semibold leading-none">{value}</span>
+              <span className="text-[11px] font-medium uppercase tracking-wide opacity-70">
+                {label}
+              </span>
             </div>
           ))}
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Ingredients</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="flex flex-col divide-y divide-border/60">
-              {recipe.ingredients.map((ingredient) => (
-                <li key={ingredient.id} className="flex items-baseline justify-between gap-4 py-2.5">
-                  <span>{ingredient.name}</span>
-                  <span className="shrink-0 text-sm font-medium text-muted-foreground">
-                    {ingredient.quantity}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <section>
+          <h2 className="mb-1 font-serif text-2xl">Ingredients</h2>
+          <IngredientChecklist recipeId={recipe.id} ingredients={recipe.ingredients} />
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Steps</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ol className="flex flex-col gap-4">
-              {recipe.steps.map((step, index) => (
-                <li key={step.id} className="flex gap-3">
-                  <span
-                    aria-hidden
-                    className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground"
-                  >
-                    {index + 1}
-                  </span>
-                  <p className="pt-0.5 leading-relaxed">{step.instruction}</p>
-                </li>
-              ))}
-            </ol>
-          </CardContent>
-        </Card>
-
-        <Button asChild size="lg" className="w-full">
-          <Link href={`/cook/${recipe.id}`}>
-            <ChefHat aria-hidden />
-            Start cooking
-          </Link>
-        </Button>
+        <section>
+          <h2 className="mb-2 font-serif text-2xl">Steps</h2>
+          <ol className="flex flex-col gap-4">
+            {recipe.steps.map((step, index) => (
+              <li key={step.id} className="flex gap-3">
+                <span
+                  aria-hidden
+                  className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground"
+                >
+                  {index + 1}
+                </span>
+                <p className="pt-0.5 leading-relaxed">{step.instruction}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
       </div>
     </div>
   );

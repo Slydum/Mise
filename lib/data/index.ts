@@ -4,6 +4,7 @@ import type {
   MealType,
   PlannedMeal,
   Recipe,
+  UseSoonItem,
   UserProfile,
 } from "@/lib/types";
 import { MEAL_TYPES } from "@/lib/types";
@@ -12,6 +13,7 @@ import {
   mockGroceryItems,
   mockProfile,
   mockRecipes,
+  mockUseSoon,
   weeklyRotation,
 } from "./mock-data";
 
@@ -65,4 +67,27 @@ export async function getGroceryList(): Promise<GroceryItem[]> {
 
 export async function getProfile(): Promise<UserProfile> {
   return mockProfile;
+}
+
+export async function getUseSoonIngredients(): Promise<UseSoonItem[]> {
+  return mockUseSoon;
+}
+
+/**
+ * A small, deterministic rotation of recipes to surface as inspiration —
+ * excludes whatever's already planned so it reads as discovery, not a repeat.
+ * `seedKey` (typically today's date key) varies the starting point day to
+ * day without relying on randomness, so server and client render the same list.
+ */
+export async function getSuggestedRecipes(
+  excludeIds: string[] = [],
+  seedKey = "",
+  count = 6,
+): Promise<Recipe[]> {
+  const pool = mockRecipes.filter((r) => !excludeIds.includes(r.id));
+  if (pool.length === 0) return [];
+  let seed = 0;
+  for (let i = 0; i < seedKey.length; i++) seed = (seed + seedKey.charCodeAt(i)) % pool.length;
+  const rotated = [...pool.slice(seed), ...pool.slice(0, seed)];
+  return rotated.slice(0, count);
 }

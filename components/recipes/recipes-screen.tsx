@@ -8,17 +8,20 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getRecipes } from "@/lib/data";
 import { useData } from "@/lib/hooks/use-data";
+import { useFavorites } from "@/lib/hooks/use-favorites";
 import type { MealType, Recipe, RecipeTag } from "@/lib/types";
 import { MEAL_TYPE_LABELS, RECIPE_TAG_LABELS } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Filter =
   | { kind: "all" }
+  | { kind: "saved" }
   | { kind: "meal"; value: MealType }
   | { kind: "tag"; value: RecipeTag };
 
 const FILTERS: { id: string; label: string; filter: Filter }[] = [
   { id: "all", label: "All", filter: { kind: "all" } },
+  { id: "saved", label: "Saved", filter: { kind: "saved" } },
   { id: "breakfast", label: MEAL_TYPE_LABELS.breakfast, filter: { kind: "meal", value: "breakfast" } },
   { id: "lunch", label: MEAL_TYPE_LABELS.lunch, filter: { kind: "meal", value: "lunch" } },
   { id: "dinner", label: MEAL_TYPE_LABELS.dinner, filter: { kind: "meal", value: "dinner" } },
@@ -28,7 +31,8 @@ const FILTERS: { id: string; label: string; filter: Filter }[] = [
   { id: "high-protein", label: RECIPE_TAG_LABELS["high-protein"], filter: { kind: "tag", value: "high-protein" } },
 ];
 
-function matches(recipe: Recipe, filter: Filter, query: string): boolean {
+function matches(recipe: Recipe, filter: Filter, query: string, favorites: Record<string, boolean>): boolean {
+  if (filter.kind === "saved" && !favorites[recipe.id]) return false;
   if (filter.kind === "meal" && !recipe.mealTypes.includes(filter.value)) return false;
   if (filter.kind === "tag" && !recipe.tags.includes(filter.value)) return false;
   if (query) {
@@ -42,18 +46,19 @@ function matches(recipe: Recipe, filter: Filter, query: string): boolean {
 
 export function RecipesScreen() {
   const recipes = useData(getRecipes);
+  const { favorites, setFavorite } = useFavorites();
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
 
   const filtered = useMemo(() => {
     if (!recipes) return null;
     const filter = FILTERS.find((f) => f.id === activeFilter)?.filter ?? { kind: "all" as const };
-    return recipes.filter((r) => matches(r, filter, query));
-  }, [recipes, activeFilter, query]);
+    return recipes.filter((r) => matches(r, filter, query, favorites));
+  }, [recipes, activeFilter, query, favorites]);
 
   return (
-    <div className="flex flex-col gap-4 animate-fade-up">
-      <ScreenHeader title="Recipes" subtitle="Your collection" />
+    <div className="flex flex-col gap-5 animate-fade-up">
+      <ScreenHeader title="Recipes" subtitle="Your cookbook" />
 
       <div className="relative px-5">
         <Search
@@ -96,9 +101,9 @@ export function RecipesScreen() {
       </div>
 
       {!filtered ? (
-        <div className="grid grid-cols-2 gap-3 px-5" aria-hidden>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-6 px-5" aria-hidden>
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-52 rounded-3xl" />
+            <Skeleton key={i} className="aspect-[4/5] rounded-3xl" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
@@ -106,16 +111,20 @@ export function RecipesScreen() {
           <span className="text-4xl" aria-hidden>
             🍽️
           </span>
-          <p className="font-semibold">No recipes found</p>
+          <p className="font-serif text-lg">No recipes found</p>
           <p className="text-sm text-muted-foreground">
             Try a different search or clear the filters.
           </p>
         </div>
       ) : (
-        <ul className="grid grid-cols-2 gap-3 px-5">
+        <ul className="grid grid-cols-2 gap-x-4 gap-y-6 px-5">
           {filtered.map((recipe) => (
             <li key={recipe.id} className="contents">
-              <RecipeCard recipe={recipe} />
+              <RecipeCard
+                recipe={recipe}
+                favorited={Boolean(favorites[recipe.id])}
+                onToggleFavorite={(active) => setFavorite(recipe.id, active)}
+              />
             </li>
           ))}
         </ul>

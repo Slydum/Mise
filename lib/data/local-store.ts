@@ -11,6 +11,10 @@ const KEYS = {
   groceryChecked: "mise.grocery.checked.v1",
   completedMeals: "mise.meals.completed.v1",
   extraMeals: "mise.meals.extra.v1",
+  favorites: "mise.recipes.favorites.v1",
+  water: "mise.water.v1",
+  activeCook: "mise.cook.active.v1",
+  ingredientChecks: "mise.recipe.ingredients.v1",
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -71,4 +75,68 @@ export function addExtraMeal(dateKey: string, mealType: MealType, recipeId: stri
   all[dateKey] = [...(all[dateKey] ?? []), meal];
   write(KEYS.extraMeals, all);
   return meal;
+}
+
+// Saved recipes ---------------------------------------------------------------
+
+export function loadFavorites(): Record<string, boolean> {
+  return read(KEYS.favorites, {});
+}
+
+export function toggleFavorite(recipeId: string): Record<string, boolean> {
+  const next = { ...loadFavorites() };
+  if (next[recipeId]) delete next[recipeId];
+  else next[recipeId] = true;
+  write(KEYS.favorites, next);
+  return next;
+}
+
+// Hydration, logged in milliliters per date key --------------------------------
+
+type WaterByDate = Record<string, number>;
+
+export function loadWaterMl(dateKey: string): number {
+  return read<WaterByDate>(KEYS.water, {})[dateKey] ?? 0;
+}
+
+export function addWaterMl(dateKey: string, amountMl: number): number {
+  const all = read<WaterByDate>(KEYS.water, {});
+  const next = Math.max(0, (all[dateKey] ?? 0) + amountMl);
+  all[dateKey] = next;
+  write(KEYS.water, all);
+  return next;
+}
+
+// In-progress cooking session, so Today can offer "Continue cooking" ----------
+
+export interface ActiveCook {
+  recipeId: string;
+  stepIndex: number;
+  updatedAt: number;
+}
+
+export function loadActiveCook(): ActiveCook | null {
+  return read<ActiveCook | null>(KEYS.activeCook, null);
+}
+
+export function saveActiveCook(recipeId: string, stepIndex: number): void {
+  write(KEYS.activeCook, { recipeId, stepIndex, updatedAt: Date.now() } satisfies ActiveCook);
+}
+
+export function clearActiveCook(): void {
+  write(KEYS.activeCook, null);
+}
+
+// Ingredient checklist, per recipe ---------------------------------------------
+
+type IngredientChecksByRecipe = Record<string, Record<string, boolean>>;
+
+export function loadIngredientChecks(recipeId: string): Record<string, boolean> {
+  return read<IngredientChecksByRecipe>(KEYS.ingredientChecks, {})[recipeId] ?? {};
+}
+
+export function saveIngredientChecks(recipeId: string, map: Record<string, boolean>): void {
+  const all = read<IngredientChecksByRecipe>(KEYS.ingredientChecks, {});
+  all[recipeId] = map;
+  write(KEYS.ingredientChecks, all);
 }

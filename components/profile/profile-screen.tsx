@@ -1,11 +1,12 @@
 "use client";
 
-import { Bell, ChevronRight, CloudOff, Ruler, Palette } from "lucide-react";
+import { Bell, ChevronRight, CloudOff, Heart, Ruler, Palette } from "lucide-react";
 import { ScreenHeader } from "@/components/screen-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProfile } from "@/lib/data";
 import { useData } from "@/lib/hooks/use-data";
+import { useFavorites } from "@/lib/hooks/use-favorites";
 
 const SETTINGS = [
   { icon: Bell, label: "Notifications", hint: "Meal reminders" },
@@ -15,9 +16,11 @@ const SETTINGS = [
 
 export function ProfileScreen() {
   const profile = useData(getProfile);
+  const { favorites } = useFavorites();
+  const savedCount = Object.keys(favorites).length;
 
   return (
-    <div className="flex flex-col gap-5 animate-fade-up">
+    <div className="flex flex-col gap-6 animate-fade-up">
       <ScreenHeader title="Profile" />
 
       {!profile ? (
@@ -26,17 +29,17 @@ export function ProfileScreen() {
           <Skeleton className="h-40 rounded-3xl" />
         </div>
       ) : (
-        <div className="flex flex-col gap-5 px-5">
+        <div className="flex flex-col gap-6 px-5">
           <Card>
             <CardContent className="flex items-center gap-4">
               <span
                 aria-hidden
-                className="flex size-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground"
+                className="flex size-16 items-center justify-center rounded-full bg-primary font-serif text-2xl text-primary-foreground"
               >
                 {profile.name.charAt(0)}
               </span>
               <div>
-                <p className="text-xl font-bold tracking-tight">{profile.name}</p>
+                <p className="font-serif text-xl tracking-tight">{profile.name}</p>
                 <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <CloudOff className="size-3.5" aria-hidden />
                   Local only — sign-in coming soon
@@ -46,26 +49,37 @@ export function ProfileScreen() {
           </Card>
 
           <Card>
+            <CardContent className="flex items-center gap-3.5">
+              <span className="flex size-9 items-center justify-center rounded-xl bg-highlight-tint text-highlight">
+                <Heart className="size-4.5" aria-hidden />
+              </span>
+              <p className="flex-1 font-medium">
+                {savedCount} {savedCount === 1 ? "recipe" : "recipes"} saved
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
             <CardHeader>
-              <CardTitle>Daily goals</CardTitle>
+              <CardTitle className="font-serif text-xl font-normal">Daily goals</CardTitle>
             </CardHeader>
             <CardContent>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <div className="rounded-2xl bg-muted/60 p-3">
                   <dt className="text-xs font-medium text-muted-foreground">Calories</dt>
-                  <dd className="text-lg font-bold">{profile.goals.calories.toLocaleString()}</dd>
+                  <dd className="text-lg font-semibold">{profile.goals.calories.toLocaleString()}</dd>
                 </div>
                 <div className="rounded-2xl bg-muted/60 p-3">
                   <dt className="text-xs font-medium text-muted-foreground">Protein</dt>
-                  <dd className="text-lg font-bold">{profile.goals.protein} g</dd>
+                  <dd className="text-lg font-semibold">{profile.goals.protein} g</dd>
                 </div>
                 <div className="rounded-2xl bg-muted/60 p-3">
                   <dt className="text-xs font-medium text-muted-foreground">Carbs</dt>
-                  <dd className="text-lg font-bold">{profile.goals.carbs} g</dd>
+                  <dd className="text-lg font-semibold">{profile.goals.carbs} g</dd>
                 </div>
                 <div className="rounded-2xl bg-muted/60 p-3">
                   <dt className="text-xs font-medium text-muted-foreground">Fat</dt>
-                  <dd className="text-lg font-bold">{profile.goals.fat} g</dd>
+                  <dd className="text-lg font-semibold">{profile.goals.fat} g</dd>
                 </div>
               </dl>
             </CardContent>
@@ -97,7 +111,7 @@ export function ProfileScreen() {
             </CardContent>
           </Card>
 
-          <p className="pb-2 text-center text-xs text-muted-foreground">Mise v0.1.0</p>
+          <p className="pb-2 text-center text-xs text-muted-foreground">Mise v0.2.0</p>
         </div>
       )}
     </div>

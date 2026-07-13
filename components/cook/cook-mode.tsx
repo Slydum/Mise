@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, PartyPopper, Timer, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { clearActiveCook, loadActiveCook, saveActiveCook } from "@/lib/data/local-store";
 import type { Recipe } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -17,13 +18,30 @@ interface CookModeProps {
  */
 export function CookMode({ recipe }: CookModeProps) {
   const router = useRouter();
+  // Resume mid-recipe if this is the recipe the user last left off on;
+  // otherwise (or on the server) always start at step 0.
   const [stepIndex, setStepIndex] = useState(0);
+
+  useEffect(() => {
+    const active = loadActiveCook();
+    if (active?.recipeId === recipe.id) setStepIndex(active.stepIndex);
+  }, [recipe.id]);
 
   const steps = recipe.steps;
   const done = stepIndex >= steps.length;
   const step = done ? null : steps[stepIndex];
 
+  // Persist progress as the user moves through steps so Today can offer
+  // "Continue cooking" if they leave before finishing.
+  useEffect(() => {
+    if (!done) saveActiveCook(recipe.id, stepIndex);
+  }, [recipe.id, stepIndex, done]);
+
   const exit = () => router.push(`/recipes/${recipe.id}`);
+  const finish = () => {
+    clearActiveCook();
+    exit();
+  };
 
   return (
     <div className="fixed inset-0 z-50 mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background pt-safe pb-safe">
@@ -64,7 +82,7 @@ export function CookMode({ recipe }: CookModeProps) {
             <span className="flex size-20 items-center justify-center rounded-full bg-accent">
               <PartyPopper className="size-9 text-primary" aria-hidden />
             </span>
-            <h2 className="text-3xl font-bold tracking-tight">All done!</h2>
+            <h2 className="font-serif text-3xl tracking-tight">All done!</h2>
             <p className="text-lg text-muted-foreground">
               Enjoy your {recipe.title.toLowerCase()}.
             </p>
@@ -77,7 +95,7 @@ export function CookMode({ recipe }: CookModeProps) {
                 About {step.durationMinutes} min
               </span>
             ) : null}
-            <p className="text-3xl font-semibold leading-snug tracking-tight">
+            <p className="font-serif text-3xl leading-snug tracking-tight">
               {step.instruction}
             </p>
           </div>
@@ -86,7 +104,7 @@ export function CookMode({ recipe }: CookModeProps) {
 
       <footer className="flex gap-3 px-5 pb-4">
         {done ? (
-          <Button size="lg" className="flex-1" onClick={exit}>
+          <Button variant="highlight" size="lg" className="flex-1" onClick={finish}>
             Finish
           </Button>
         ) : (
@@ -103,6 +121,7 @@ export function CookMode({ recipe }: CookModeProps) {
               Back
             </Button>
             <Button
+              variant="highlight"
               size="lg"
               className="flex-[2]"
               onClick={() => setStepIndex((i) => i + 1)}

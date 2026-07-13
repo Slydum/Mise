@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { DaySelector } from "@/components/plan/day-selector";
 import { MealCard } from "@/components/meal-card";
+import { MealTypeEyebrow } from "@/components/meal-type-eyebrow";
 import { QuickAddSheet } from "@/components/quick-add-sheet";
 import { ScreenHeader } from "@/components/screen-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,7 +13,7 @@ import { addExtraMeal, loadExtraMeals } from "@/lib/data/local-store";
 import { addDays, formatShortDate, fromDateKey, isToday, toDateKey, todayKey } from "@/lib/dates";
 import { useData } from "@/lib/hooks/use-data";
 import type { MealType, PlannedMeal, Recipe } from "@/lib/types";
-import { MEAL_TYPES, MEAL_TYPE_LABELS } from "@/lib/types";
+import { MEAL_TYPES } from "@/lib/types";
 
 const DAYS_SHOWN = 14;
 
@@ -65,52 +66,64 @@ export function PlanScreen() {
   const loading = !plan || !recipes || !selected;
 
   return (
-    <div className="flex flex-col gap-4 animate-fade-up">
+    <div className="flex flex-col gap-3 animate-fade-up">
       <ScreenHeader
         title="Plan"
         subtitle={
-          !selected || isToday(selected) ? "Today" : formatShortDate(fromDateKey(selected))
+          !selected || isToday(selected) ? "Your week" : formatShortDate(fromDateKey(selected))
         }
       />
 
       {selected ? (
         <DaySelector dateKeys={dateKeys} selected={selected} onSelect={setSelected} />
       ) : (
-        <div className="flex gap-2 px-5 py-2" aria-hidden>
+        <div className="flex gap-2 px-5 py-1" aria-hidden>
           {[0, 1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-[4.5rem] w-14 rounded-3xl" />
+            <Skeleton key={i} className="h-16 w-12 rounded-2xl" />
           ))}
         </div>
       )}
 
-      <div className="flex flex-col gap-6 px-5">
+      <div className="px-5 pt-2">
         {loading ? (
           <PlanSkeleton />
         ) : (
-          MEAL_TYPES.map((mealType) => {
-            const meals = [...plan.meals, ...extras].filter((m) => m.mealType === mealType);
-            return (
-              <section key={mealType} aria-label={MEAL_TYPE_LABELS[mealType]}>
-                <h2 className="mb-2 px-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  {MEAL_TYPE_LABELS[mealType]}
-                </h2>
-                <div className="flex flex-col gap-3">
-                  {meals.map((meal) => {
-                    const recipe = recipeById.get(meal.recipeId);
-                    return recipe ? <MealCard key={meal.id} recipe={recipe} /> : null;
-                  })}
-                  <button
-                    type="button"
-                    onClick={() => setQuickAdd({ open: true, mealType })}
-                    className="flex h-14 items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-border text-sm font-medium text-muted-foreground transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted"
-                  >
-                    <Plus className="size-4" aria-hidden />
-                    Add to {MEAL_TYPE_LABELS[mealType].toLowerCase()}
-                  </button>
+          <div className="divide-y divide-border/60 rounded-3xl border border-border/60 bg-card px-5 shadow-soft">
+            {MEAL_TYPES.map((mealType) => {
+              const meals = [...plan.meals, ...extras].filter((m) => m.mealType === mealType);
+              return (
+                <div key={mealType} className="py-2.5">
+                  {meals.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setQuickAdd({ open: true, mealType })}
+                      className="flex w-full items-center gap-4 py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <span
+                        aria-hidden
+                        className="flex size-14 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-border text-muted-foreground"
+                      >
+                        <Plus className="size-5" aria-hidden />
+                      </span>
+                      <span>
+                        <MealTypeEyebrow mealType={mealType} />
+                        <span className="block font-serif text-lg text-muted-foreground">
+                          Browse recipes to add {mealType}
+                        </span>
+                      </span>
+                    </button>
+                  ) : (
+                    meals.map((meal) => {
+                      const recipe = recipeById.get(meal.recipeId);
+                      return recipe ? (
+                        <MealCard key={meal.id} recipe={recipe} mealType={mealType} />
+                      ) : null;
+                    })
+                  )}
                 </div>
-              </section>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
 
@@ -125,14 +138,5 @@ export function PlanScreen() {
 }
 
 function PlanSkeleton() {
-  return (
-    <div className="flex flex-col gap-6" aria-hidden>
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="flex flex-col gap-3">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-20 rounded-3xl" />
-        </div>
-      ))}
-    </div>
-  );
+  return <Skeleton className="h-80 rounded-3xl" aria-hidden />;
 }

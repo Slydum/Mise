@@ -10,12 +10,12 @@ interface ScreenHeaderProps {
 /** Large-typography page header shared by all tab screens. */
 export function ScreenHeader({ title, subtitle, className, children }: ScreenHeaderProps) {
   return (
-    <header className={cn("flex items-start justify-between gap-4 px-5 pt-4", className)}>
+    <header className={cn("flex items-start justify-between gap-4 px-5 pt-5", className)}>
       <div className="min-w-0">
         {subtitle ? (
           <p className="text-sm font-medium text-muted-foreground">{subtitle}</p>
         ) : null}
-        <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+        <h1 className="font-serif text-4xl font-medium tracking-tight">{title}</h1>
       </div>
       {children}
     </header>

@@ -11,6 +11,13 @@ export const MEAL_TYPE_LABELS: Record<MealType, string> = {
   snack: "Snacks",
 };
 
+export const MEAL_TYPE_EMOJI: Record<MealType, string> = {
+  breakfast: "🍳",
+  lunch: "🥗",
+  dinner: "🍝",
+  snack: "🍪",
+};
+
 export interface Nutrition {
   calories: number;
   protein: number;
@@ -82,8 +89,10 @@ export interface Recipe {
   id: string;
   title: string;
   description: string;
-  /** Emoji used as offline-friendly artwork for the recipe. */
+  /** Emoji used as offline-friendly artwork when imageUrl is absent, and as a small identity mark elsewhere. */
   emoji: string;
+  /** Optional hero photo. Falls back to generated cover art (see components/food-cover.tsx) until real photography is supplied. */
+  imageUrl?: string;
   mealTypes: MealType[];
   tags: RecipeTag[];
   prepMinutes: number;
@@ -114,7 +123,17 @@ export interface GroceryItem {
   category: GroceryCategory;
 }
 
+/** An ingredient the user already has on hand that's nearing its use-by point. */
+export interface UseSoonItem {
+  id: string;
+  name: string;
+  emoji: string;
+  daysLeft: number;
+}
+
 export interface UserProfile {
   name: string;
   goals: Nutrition;
+  /** Daily hydration goal, in milliliters. */
+  waterGoalMl: number;
 }

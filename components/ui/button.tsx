@@ -9,6 +9,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground shadow-sm active:bg-primary-soft",
+        highlight: "bg-highlight text-highlight-foreground shadow-sm active:bg-highlight-soft",
         secondary: "bg-secondary text-secondary-foreground",
         accent: "bg-accent text-accent-foreground",
         outline: "border border-border bg-card text-foreground",

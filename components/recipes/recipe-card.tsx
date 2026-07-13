@@ -1,47 +1,55 @@
+"use client";
+
 import Link from "next/link";
-import { Clock, Flame } from "lucide-react";
+import { Clock } from "lucide-react";
+import { FavoriteButton } from "@/components/favorite-button";
+import { FoodCover } from "@/components/food-cover";
 import { Badge } from "@/components/ui/badge";
 import type { Recipe } from "@/lib/types";
 import { RECIPE_TAG_LABELS } from "@/lib/types";
 
 interface RecipeCardProps {
   recipe: Recipe;
+  favorited: boolean;
+  onToggleFavorite: (active: boolean) => void;
 }
 
-/** Tappable recipe tile for the 2-column browse grid. */
-export function RecipeCard({ recipe }: RecipeCardProps) {
+/** Photography-forward recipe tile for the browse grid — Pinterest-style. */
+export function RecipeCard({ recipe, favorited, onToggleFavorite }: RecipeCardProps) {
+  const tag = recipe.tags[0];
+
   return (
     <Link
       href={`/recipes/${recipe.id}`}
-      className="group flex flex-col overflow-hidden rounded-3xl border border-border/60 bg-card shadow-[0_1px_3px_rgba(43,41,37,0.05)] transition-transform duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]"
+      className="group flex flex-col outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-3xl"
     >
-      <div
-        aria-hidden
-        className="flex h-28 items-center justify-center bg-accent text-5xl"
-      >
-        {recipe.emoji}
-      </div>
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <h3 className="line-clamp-2 font-semibold leading-snug">{recipe.title}</h3>
-        <div className="mt-auto flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Clock className="size-3.5" aria-hidden />
-            {recipe.prepMinutes + recipe.cookMinutes} min
-          </span>
-          <span className="flex items-center gap-1">
-            <Flame className="size-3.5" aria-hidden />
-            {recipe.nutrition.calories}
-          </span>
-        </div>
-        {recipe.tags.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
-            {recipe.tags.slice(0, 2).map((tag) => (
-              <Badge key={tag} variant="muted" className="px-2 py-0.5 text-[10px]">
-                {RECIPE_TAG_LABELS[tag]}
-              </Badge>
-            ))}
-          </div>
+      <div className="relative">
+        <FoodCover
+          recipe={recipe}
+          aspect="portrait"
+          rounded="rounded-3xl"
+          emojiClassName="text-5xl"
+          className="shadow-soft transition-transform duration-200 group-active:scale-[0.97]"
+        />
+        <FavoriteButton
+          recipeId={recipe.id}
+          recipeTitle={recipe.title}
+          active={favorited}
+          onToggle={onToggleFavorite}
+          className="absolute right-2.5 top-2.5"
+        />
+        {tag ? (
+          <Badge variant="highlight" className="absolute bottom-2.5 left-2.5 shadow-sm">
+            {RECIPE_TAG_LABELS[tag]}
+          </Badge>
         ) : null}
+      </div>
+      <div className="flex flex-col gap-1 px-1 pt-3">
+        <h3 className="line-clamp-2 font-serif text-lg leading-snug">{recipe.title}</h3>
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Clock className="size-3.5" aria-hidden />
+          {recipe.prepMinutes + recipe.cookMinutes} min · {recipe.nutrition.calories} cal
+        </span>
       </div>
     </Link>
   );
