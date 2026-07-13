@@ -1,11 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+// Next.js does not apply basePath to metadata URLs, so prefix them manually
+// for subpath deploys like GitHub Pages.
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
 export const metadata: Metadata = {
   title: "Mise",
   description: "Plan your meals, cook with ease.",
   applicationName: "Mise",
-  manifest: "/manifest.webmanifest",
+  manifest: `${basePath}/manifest.webmanifest`,
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -15,7 +19,7 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
-    apple: "/icons/apple-touch-icon.png",
+    apple: `${basePath}/icons/apple-touch-icon.png`,
   },
 };
 

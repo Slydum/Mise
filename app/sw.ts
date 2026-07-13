@@ -21,22 +21,35 @@ declare const self: ServiceWorkerGlobalScope;
  * - `defaultCache` adds sensible runtime caching for everything else; when
  *   Supabase is integrated, add a NetworkFirst route for its REST calls here.
  */
+// Serwist replaces this token at build time and requires it to appear
+// exactly once, so capture it before using it in more than one place.
+const precacheEntries = self.__SW_MANIFEST;
+
+// The offline fallback URL depends on the deploy target (e.g. it gains a
+// base path + trailing slash on GitHub Pages), so look up the exact key that
+// was precached rather than hardcoding it.
+const offlineFallbackUrl = (precacheEntries ?? [])
+  .map((entry) => (typeof entry === "string" ? entry : entry.url))
+  .find((url) => url.includes("~offline"));
+
 const serwist = new Serwist({
-  precacheEntries: self.__SW_MANIFEST,
+  precacheEntries,
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: defaultCache,
-  fallbacks: {
-    entries: [
-      {
-        url: "/~offline",
-        matcher({ request }) {
-          return request.destination === "document";
-        },
-      },
-    ],
-  },
+  fallbacks: offlineFallbackUrl
+    ? {
+        entries: [
+          {
+            url: offlineFallbackUrl,
+            matcher({ request }) {
+              return request.destination === "document";
+            },
+          },
+        ],
+      }
+    : undefined,
 });
 
 serwist.addEventListeners();

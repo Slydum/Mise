@@ -60,6 +60,21 @@ currently ships in the bundle, the whole app works offline after first load.
 User state lives in localStorage. When Supabase lands, add a NetworkFirst
 runtime route for its API and keep localStorage as the optimistic cache.
 
+## Deployment (GitHub Pages)
+
+Pushes to `main` trigger `.github/workflows/deploy-pages.yml`, which builds a
+static export (`STATIC_EXPORT=1`, `NEXT_PUBLIC_BASE_PATH=/Mise`) and deploys
+`out/` to GitHub Pages at `https://<user>.github.io/Mise/`.
+
+One-time setup: in the repo's **Settings → Pages**, set **Source** to
+**GitHub Actions** (otherwise Pages keeps serving the README via Jekyll).
+
+To reproduce the Pages build locally:
+
+```bash
+STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/Mise npm run build   # outputs ./out
+```
+
 ## Supabase (next step)
 
 1. Copy `.env.example` to `.env.local` and fill in the project URL + anon key.
