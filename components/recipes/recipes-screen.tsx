@@ -1,17 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import Link from "next/link";
+import { Plus, Search } from "lucide-react";
 import { RecipeCard } from "@/components/recipes/recipe-card";
 import { ScreenHeader } from "@/components/screen-header";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getRecipes } from "@/lib/data";
+import { useCustomRecipes } from "@/lib/hooks/use-custom-recipes";
 import { useData } from "@/lib/hooks/use-data";
 import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useFavorites } from "@/lib/hooks/use-favorites";
 import type { MealType, Recipe, RecipeTag } from "@/lib/types";
-import { MEAL_TYPE_LABELS, RECIPE_TAG_LABELS } from "@/lib/types";
+import { hasRecipeContent, MEAL_TYPE_LABELS, RECIPE_TAG_LABELS } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Filter =
@@ -47,11 +49,17 @@ function matches(recipe: Recipe, filter: Filter, query: string, favorites: Recor
 }
 
 export function RecipesScreen() {
-  const recipes = useData(getRecipes);
+  const catalogRecipes = useData(getRecipes);
+  const customRecipes = useCustomRecipes();
   const { favorites, setFavorite } = useFavorites();
   const { dietaryStyle } = useDietaryStyle();
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+
+  const recipes = useMemo(
+    () => (catalogRecipes ? [...customRecipes.filter(hasRecipeContent), ...catalogRecipes] : null),
+    [catalogRecipes, customRecipes],
+  );
 
   const filtered = useMemo(() => {
     if (!recipes) return null;
@@ -61,7 +69,15 @@ export function RecipesScreen() {
 
   return (
     <div className="flex flex-col gap-5 animate-fade-up">
-      <ScreenHeader title="Recipes" subtitle="Your cookbook" />
+      <ScreenHeader title="Recipes" subtitle="Your cookbook">
+        <Link
+          href="/recipes/new"
+          aria-label="Create a recipe"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-highlight text-highlight-foreground shadow-soft transition-transform duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-90"
+        >
+          <Plus className="size-4.5" aria-hidden />
+        </Link>
+      </ScreenHeader>
 
       <div className="relative px-5">
         <Search

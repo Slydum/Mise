@@ -15,7 +15,17 @@ import {
   saveSlotOverride,
 } from "@/lib/data/local-store";
 import { addDays, fromDateKey, toDateKey } from "@/lib/dates";
-import type { DietaryStyle, LeftoverEntry, MealType, PlannedMeal, Recipe } from "@/lib/types";
+import { deriveDietaryStyles } from "@/lib/diet";
+import type {
+  DietaryStyle,
+  GroceryCategory,
+  LeftoverEntry,
+  MealType,
+  Nutrition,
+  PlannedMeal,
+  Recipe,
+  RecipeTag,
+} from "@/lib/types";
 import { CUSTOM_RECIPE_ID_PREFIX, DIETARY_STYLES, MEAL_TYPES } from "@/lib/types";
 
 /**
@@ -302,6 +312,49 @@ export function createCustomMealRecipe(name: string): Recipe {
     nutrition: { calories: 0, protein: 0, carbs: 0, fat: 0 },
     ingredients: [],
     steps: [],
+  };
+  saveCustomRecipe(recipe);
+  return recipe;
+}
+
+export interface CreateRecipeInput {
+  title: string;
+  description: string;
+  imageUrl?: string;
+  emoji: string;
+  mealTypes: MealType[];
+  tags: RecipeTag[];
+  prepMinutes: number;
+  cookMinutes: number;
+  servings: number;
+  nutrition: Nutrition;
+  ingredients: { name: string; amount: number; unit: string; category: GroceryCategory }[];
+  steps: string[];
+}
+
+/** Builds a full Recipe from the create-recipe form and persists it alongside quick-add custom meals. */
+export function saveCreatedRecipe(input: CreateRecipeInput): Recipe {
+  const recipe: Recipe = {
+    id: `${CUSTOM_RECIPE_ID_PREFIX}${Date.now()}`,
+    title: input.title.trim(),
+    description: input.description.trim(),
+    emoji: input.emoji,
+    imageUrl: input.imageUrl,
+    mealTypes: input.mealTypes.length > 0 ? input.mealTypes : MEAL_TYPES,
+    tags: input.tags,
+    dietaryStyles: deriveDietaryStyles(input.tags),
+    prepMinutes: input.prepMinutes,
+    cookMinutes: input.cookMinutes,
+    servings: Math.max(1, input.servings),
+    nutrition: input.nutrition,
+    ingredients: input.ingredients.map((ingredient, index) => ({
+      id: `ing-${index}`,
+      name: ingredient.name,
+      amount: ingredient.amount,
+      unit: ingredient.unit,
+      category: ingredient.category,
+    })),
+    steps: input.steps.map((instruction, index) => ({ id: `step-${index}`, instruction })),
   };
   saveCustomRecipe(recipe);
   return recipe;

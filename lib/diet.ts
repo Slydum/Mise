@@ -1,4 +1,4 @@
-import type { DietaryStyle, Recipe } from "@/lib/types";
+import type { DietaryStyle, Recipe, RecipeTag } from "@/lib/types";
 
 /** Whether a recipe satisfies the given eating style. */
 export function isRecipeDietCompatible(recipe: Recipe, style: DietaryStyle): boolean {
@@ -24,6 +24,20 @@ export function recipeContainsAnyIngredient(recipe: Recipe, terms: string[]): st
     if (match) return raw;
   }
   return null;
+}
+
+/**
+ * Derives the eating styles a recipe satisfies from its diet-identity tags,
+ * mirroring the convention documented on DietaryStyle: a vegan recipe also
+ * satisfies vegetarian/pescatarian/omnivore, and so on down the chain. Used
+ * when a user creates their own recipe, where dietaryStyles isn't asked for
+ * directly — it's inferred from the tags they do pick.
+ */
+export function deriveDietaryStyles(tags: RecipeTag[]): DietaryStyle[] {
+  if (tags.includes("vegan")) return ["vegan", "vegetarian", "pescatarian", "omnivore"];
+  if (tags.includes("vegetarian")) return ["vegetarian", "pescatarian", "omnivore"];
+  if (tags.includes("pescatarian")) return ["pescatarian", "omnivore"];
+  return ["omnivore"];
 }
 
 /** Finds a diet-compatible recipe covering at least one shared meal slot, for swap suggestions. */

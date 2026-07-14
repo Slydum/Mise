@@ -7,7 +7,7 @@ import { FoodCover } from "@/components/food-cover";
 import { Badge } from "@/components/ui/badge";
 import { isRecipeDietCompatible } from "@/lib/diet";
 import type { DietaryStyle, Recipe } from "@/lib/types";
-import { DIETARY_STYLE_LABELS, RECIPE_TAG_LABELS } from "@/lib/types";
+import { CUSTOM_RECIPE_ID_PREFIX, DIETARY_STYLE_LABELS, RECIPE_TAG_LABELS } from "@/lib/types";
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -20,10 +20,13 @@ interface RecipeCardProps {
 export function RecipeCard({ recipe, favorited, onToggleFavorite, dietaryStyle }: RecipeCardProps) {
   const tag = recipe.tags[0];
   const compatible = isRecipeDietCompatible(recipe, dietaryStyle);
+  const href = recipe.id.startsWith(CUSTOM_RECIPE_ID_PREFIX)
+    ? `/recipes/custom?id=${recipe.id}`
+    : `/recipes/${recipe.id}`;
 
   return (
     <Link
-      href={`/recipes/${recipe.id}`}
+      href={href}
       className="group flex flex-col outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-3xl"
     >
       <div className="relative">

@@ -6,7 +6,7 @@ import { FoodCover } from "@/components/food-cover";
 import { MealTypeEyebrow } from "@/components/meal-type-eyebrow";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { MealType, Recipe } from "@/lib/types";
-import { CUSTOM_RECIPE_ID_PREFIX } from "@/lib/types";
+import { CUSTOM_RECIPE_ID_PREFIX, hasRecipeContent } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface MealCardProps {
@@ -32,9 +32,13 @@ export function MealCard({
   onOpenActions,
   className,
 }: MealCardProps) {
-  // Custom meals have no prerendered static detail/cook page (the app is a
-  // fully static export), so they open the action sheet instead of a dead link.
   const isCustom = recipe.id.startsWith(CUSTOM_RECIPE_ID_PREFIX);
+  // A name-only "Add custom meal" quick-add has nothing to show on a detail
+  // page, so it opens the action sheet directly; a custom recipe with real
+  // ingredients/steps gets a real (query-param routed) detail page like a
+  // catalog recipe — see app/(tabs)/recipes/custom/page.tsx.
+  const hasDetail = !isCustom || hasRecipeContent(recipe);
+  const detailHref = isCustom ? `/recipes/custom?id=${recipe.id}` : `/recipes/${recipe.id}`;
 
   const thumbnail = (
     <>
@@ -61,7 +65,14 @@ export function MealCard({
 
   return (
     <div className={cn("relative flex items-center gap-4 py-2.5", className)}>
-      {isCustom ? (
+      {hasDetail ? (
+        <Link
+          href={detailHref}
+          className="flex min-w-0 flex-1 items-center gap-4 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {thumbnail}
+        </Link>
+      ) : (
         <button
           type="button"
           onClick={onOpenActions}
@@ -69,13 +80,6 @@ export function MealCard({
         >
           {thumbnail}
         </button>
-      ) : (
-        <Link
-          href={`/recipes/${recipe.id}`}
-          className="flex min-w-0 flex-1 items-center gap-4 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {thumbnail}
-        </Link>
       )}
 
       {onToggleCompleted ? (
@@ -89,7 +93,7 @@ export function MealCard({
         </span>
       ) : null}
 
-      {onOpenActions && !isCustom ? (
+      {onOpenActions && hasDetail ? (
         <button
           type="button"
           onClick={onOpenActions}

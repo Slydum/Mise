@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, PartyPopper, Timer, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { clearActiveCook, loadActiveCook, saveActiveCook } from "@/lib/data/local-store";
 import type { Recipe } from "@/lib/types";
+import { CUSTOM_RECIPE_ID_PREFIX } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface CookModeProps {
@@ -37,7 +38,9 @@ export function CookMode({ recipe }: CookModeProps) {
     if (!done) saveActiveCook(recipe.id, stepIndex);
   }, [recipe.id, stepIndex, done]);
 
-  const exit = () => router.push(`/recipes/${recipe.id}`);
+  const isCustom = recipe.id.startsWith(CUSTOM_RECIPE_ID_PREFIX);
+  const exit = () =>
+    router.push(isCustom ? `/recipes/custom?id=${recipe.id}` : `/recipes/${recipe.id}`);
   const finish = () => {
     clearActiveCook();
     exit();

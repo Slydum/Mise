@@ -15,7 +15,7 @@ import { addGroceryItems } from "@/lib/data/local-store";
 import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useToast } from "@/lib/hooks/use-toast";
 import type { GroceryItem, MealType, Recipe } from "@/lib/types";
-import { MEAL_TYPE_LABELS, RECIPE_TAG_LABELS } from "@/lib/types";
+import { CUSTOM_RECIPE_ID_PREFIX, MEAL_TYPE_LABELS, RECIPE_TAG_LABELS } from "@/lib/types";
 
 interface RecipeDetailViewProps {
   recipe: Recipe;
@@ -32,6 +32,8 @@ export function RecipeDetailView({ recipe, allRecipes }: RecipeDetailViewProps) 
   const scale = servings / recipe.servings;
   const hasIngredients = recipe.ingredients.length > 0;
   const hasSteps = recipe.steps.length > 0;
+  const isCustom = recipe.id.startsWith(CUSTOM_RECIPE_ID_PREFIX);
+  const cookHref = isCustom ? `/cook/custom?id=${recipe.id}` : `/cook/${recipe.id}`;
 
   const nutritionChips = [
     { label: "Calories", value: Math.round(recipe.nutrition.calories * scale) },
@@ -87,7 +89,7 @@ export function RecipeDetailView({ recipe, allRecipes }: RecipeDetailViewProps) 
         <div className="flex flex-col gap-2.5">
           {hasSteps ? (
             <Button asChild variant="highlight" size="lg" className="w-full">
-              <Link href={`/cook/${recipe.id}`}>
+              <Link href={cookHref}>
                 <ChefHat aria-hidden />
                 Cook
               </Link>

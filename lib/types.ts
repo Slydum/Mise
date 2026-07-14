@@ -171,6 +171,16 @@ export interface LeftoverEntry {
 /** Prefix marking a synthetic Recipe created via "Add custom meal" — never has a prerendered detail/cook page. */
 export const CUSTOM_RECIPE_ID_PREFIX = "custom-";
 
+/**
+ * True once a custom recipe has real ingredients or steps, i.e. it was made
+ * via the recipe-creation form rather than a name-only "Add custom meal"
+ * quick-add. Catalog recipes always have content. Used to decide whether a
+ * custom recipe gets its own detail/cook page or just opens the action sheet.
+ */
+export function hasRecipeContent(recipe: Recipe): boolean {
+  return recipe.ingredients.length > 0 || recipe.steps.length > 0;
+}
+
 export interface GroceryItem {
   id: string;
   name: string;
