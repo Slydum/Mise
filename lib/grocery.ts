@@ -6,9 +6,19 @@ export function canonicalKey(name: string): string {
   return name.trim().toLowerCase();
 }
 
-/** Formats a peso amount for display, e.g. `formatPhp(1234.5)` -> "₱1,235". */
+/** Formats a peso amount for display, e.g. `formatPhp(1234.5)` -> "₱1,235", `formatPhp(-137)` -> "-₱137". */
 export function formatPhp(amount: number): string {
-  return `₱${Math.round(amount).toLocaleString()}`;
+  const rounded = Math.round(Math.abs(amount));
+  return `${amount < 0 ? "-" : ""}₱${rounded.toLocaleString()}`;
+}
+
+// Summing many small per-recipe fractions (e.g. "2 cloves" as 0.2 of a garlic
+// bulb, repeated across several recipes) can land a hair above a whole
+// package purely from floating-point error. A tiny tolerance keeps that from
+// rounding up to an extra unneeded package.
+const PACKAGE_ROUNDING_EPSILON = 1e-6;
+function packagesNeededFor(amount: number, packageAmount: number): number {
+  return Math.max(1, Math.ceil(amount / packageAmount - PACKAGE_ROUNDING_EPSILON));
 }
 
 // Warn (once per key, dev only) when a recipe ingredient has no matching
@@ -150,7 +160,7 @@ export function buildGroceryList({
     if (remaining <= 0) continue; // fully covered by pantry
 
     const packageAmount = catalogEntry?.packageAmount ?? remaining;
-    const packagesNeeded = Math.max(1, Math.ceil(remaining / packageAmount));
+    const packagesNeeded = packagesNeededFor(remaining, packageAmount);
     const unitPricePhp = catalogEntry?.pricePhp ?? 0;
     const lineTotalPhp = packagesNeeded * unitPricePhp;
     basketTotalPhp += lineTotalPhp;
@@ -217,7 +227,7 @@ export function summarizeDay(
       checkCatalogEntry(key, ingredient.name, ingredient.unit, catalogEntry);
       if (!catalogEntry || catalogEntry.pantryStaple) continue;
       const scaledAmount = ingredient.amount * scale;
-      const packagesNeeded = Math.max(1, Math.ceil(scaledAmount / catalogEntry.packageAmount));
+      const packagesNeeded = packagesNeededFor(scaledAmount, catalogEntry.packageAmount);
       estimatedCostPhp += packagesNeeded * catalogEntry.pricePhp;
     }
   }
