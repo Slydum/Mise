@@ -1,4 +1,4 @@
-import type { DietaryStyle, MealType, PlannedMeal } from "@/lib/types";
+import type { DietaryStyle, LeftoverEntry, MealType, PlannedMeal, Recipe } from "@/lib/types";
 import { DEFAULT_DIETARY_STYLE } from "@/lib/types";
 
 /**
@@ -20,6 +20,10 @@ const KEYS = {
   allergies: "mise.profile.allergies.v1",
   excludedIngredients: "mise.profile.excludedIngredients.v1",
   favoriteIngredients: "mise.profile.favoriteIngredients.v1",
+  planSlotOverrides: "mise.plan.overrides.v1",
+  planRegenSeed: "mise.plan.regenSeed.v1",
+  customRecipes: "mise.recipes.custom.v1",
+  leftovers: "mise.leftovers.v1",
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -69,17 +73,36 @@ export function loadExtraMeals(dateKey: string): PlannedMeal[] {
   return read<ExtraMealsByDate>(KEYS.extraMeals, {})[dateKey] ?? [];
 }
 
-export function addExtraMeal(dateKey: string, mealType: MealType, recipeId: string): PlannedMeal {
+export function addExtraMeal(
+  dateKey: string,
+  mealType: MealType,
+  recipeId: string,
+  opts?: { isLeftover?: boolean; sourceLeftoverId?: string },
+): PlannedMeal {
   const all = read<ExtraMealsByDate>(KEYS.extraMeals, {});
   const meal: PlannedMeal = {
     id: `extra-${dateKey}-${mealType}-${Date.now()}`,
     date: dateKey,
     mealType,
     recipeId,
+    ...(opts?.isLeftover ? { isLeftover: true } : {}),
+    ...(opts?.sourceLeftoverId ? { sourceLeftoverId: opts.sourceLeftoverId } : {}),
   };
   all[dateKey] = [...(all[dateKey] ?? []), meal];
   write(KEYS.extraMeals, all);
   return meal;
+}
+
+export function removeExtraMeal(dateKey: string, mealId: string): void {
+  const all = read<ExtraMealsByDate>(KEYS.extraMeals, {});
+  all[dateKey] = (all[dateKey] ?? []).filter((m) => m.id !== mealId);
+  write(KEYS.extraMeals, all);
+}
+
+export function clearExtraMeals(dateKey: string): void {
+  const all = read<ExtraMealsByDate>(KEYS.extraMeals, {});
+  delete all[dateKey];
+  write(KEYS.extraMeals, all);
 }
 
 // Saved recipes ---------------------------------------------------------------
@@ -178,4 +201,81 @@ export function loadFavoriteIngredients(): string[] {
 
 export function saveFavoriteIngredients(values: string[]): void {
   write(KEYS.favoriteIngredients, values);
+}
+
+// Plan slot overrides ----------------------------------------------------------
+// Governs the single deterministic rotation slot for a given `${date}-${mealType}`
+// key: a `recipeId` string substitutes the rotation's pick, `recipeId: null`
+// removes it with no replacement, and an absent key means "show the rotation
+// pick as-is." Separate from extraMeals, which is an unbounded additive stack
+// on top of whatever a slot resolves to.
+
+export interface SlotOverride {
+  recipeId: string | null;
+  isLeftover?: boolean;
+  sourceLeftoverId?: string;
+}
+
+type SlotOverridesMap = Record<string, SlotOverride>;
+
+export function loadSlotOverrides(): SlotOverridesMap {
+  return read(KEYS.planSlotOverrides, {});
+}
+
+export function saveSlotOverride(slotId: string, override: SlotOverride): void {
+  const all = read<SlotOverridesMap>(KEYS.planSlotOverrides, {});
+  all[slotId] = override;
+  write(KEYS.planSlotOverrides, all);
+}
+
+// Regeneration seed, per date key -----------------------------------------------
+// The rotation is deterministic per day-of-week, so "Regenerate day" needs its
+// own entropy source to produce a different result on repeat taps.
+
+export function loadRegenSeed(dateKey: string): number {
+  return read<Record<string, number>>(KEYS.planRegenSeed, {})[dateKey] ?? 0;
+}
+
+export function bumpRegenSeed(dateKey: string): number {
+  const all = read<Record<string, number>>(KEYS.planRegenSeed, {});
+  const next = (all[dateKey] ?? 0) + 1;
+  all[dateKey] = next;
+  write(KEYS.planRegenSeed, all);
+  return next;
+}
+
+// Custom (user-authored) recipes, keyed by id -----------------------------------
+
+export function loadCustomRecipes(): Record<string, Recipe> {
+  return read(KEYS.customRecipes, {});
+}
+
+export function saveCustomRecipe(recipe: Recipe): void {
+  const all = read<Record<string, Recipe>>(KEYS.customRecipes, {});
+  all[recipe.id] = recipe;
+  write(KEYS.customRecipes, all);
+}
+
+// Leftovers ----------------------------------------------------------------------
+// Entries older than LEFTOVER_PRUNE_MS are dropped on write to bound storage
+// growth; the 3-day "available to use" expiry is applied by the caller (see
+// lib/hooks/use-leftovers.ts) so already-consumed history isn't lost early.
+
+const LEFTOVER_PRUNE_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function loadLeftovers(): LeftoverEntry[] {
+  return read<LeftoverEntry[]>(KEYS.leftovers, []);
+}
+
+export function saveLeftover(entry: LeftoverEntry): void {
+  const all = read<LeftoverEntry[]>(KEYS.leftovers, []);
+  const now = Date.now();
+  const pruned = all.filter((e) => now - e.createdAt <= LEFTOVER_PRUNE_MS);
+  write(KEYS.leftovers, [...pruned, entry]);
+}
+
+export function consumeLeftover(id: string, consumedInto: { date: string; mealType: MealType }): void {
+  const all = read<LeftoverEntry[]>(KEYS.leftovers, []);
+  const next = all.map((e) => (e.id === id ? { ...e, consumed: true, consumedInto } : e));
+  write(KEYS.leftovers, next);
 }

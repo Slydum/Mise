@@ -23,11 +23,19 @@ interface QuickAddSheetProps {
   onOpenChange: (open: boolean) => void;
   /** Preselects a slot when opened from the Plan screen. */
   initialMealType?: MealType;
+  /** "replace" swaps only the title/description text — the callback contract is unchanged. */
+  mode?: "add" | "replace";
   onAdd: (mealType: MealType, recipe: Recipe) => void;
 }
 
-/** Bottom sheet for quick-adding a recipe to a meal slot. Only suggests recipes matching the user's food preferences. */
-export function QuickAddSheet({ open, onOpenChange, initialMealType, onAdd }: QuickAddSheetProps) {
+/** Bottom sheet for quick-adding (or replacing) a recipe in a meal slot. Only suggests recipes matching the user's food preferences. */
+export function QuickAddSheet({
+  open,
+  onOpenChange,
+  initialMealType,
+  mode = "add",
+  onAdd,
+}: QuickAddSheetProps) {
   const recipes = useData(getRecipes);
   const { dietaryStyle } = useDietaryStyle();
   const { allergies, excludedIngredients } = useFoodPreferences();
@@ -58,32 +66,38 @@ export function QuickAddSheet({ open, onOpenChange, initialMealType, onAdd }: Qu
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent>
-        <SheetTitle>Add a meal</SheetTitle>
-        <SheetDescription>Pick a slot, then choose a recipe.</SheetDescription>
+        <SheetTitle>{mode === "replace" ? "Replace this meal" : "Add a meal"}</SheetTitle>
+        <SheetDescription>
+          {mode === "replace" ? "Choose a new recipe for this slot." : "Pick a slot, then choose a recipe."}
+        </SheetDescription>
 
-        <div
-          role="radiogroup"
-          aria-label="Meal slot"
-          className="flex gap-2 overflow-x-auto px-6 py-4 no-scrollbar"
-        >
-          {MEAL_TYPES.map((type) => (
-            <button
-              key={type}
-              type="button"
-              role="radio"
-              aria-checked={mealType === type}
-              onClick={() => setMealType(type)}
-              className={cn(
-                "h-10 shrink-0 rounded-full px-4 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                mealType === type
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground",
-              )}
-            >
-              {MEAL_TYPE_LABELS[type]}
-            </button>
-          ))}
-        </div>
+        {mode === "add" ? (
+          <div
+            role="radiogroup"
+            aria-label="Meal slot"
+            className="flex gap-2 overflow-x-auto px-6 py-4 no-scrollbar"
+          >
+            {MEAL_TYPES.map((type) => (
+              <button
+                key={type}
+                type="button"
+                role="radio"
+                aria-checked={mealType === type}
+                onClick={() => setMealType(type)}
+                className={cn(
+                  "h-10 shrink-0 rounded-full px-4 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  mealType === type
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground",
+                )}
+              >
+                {MEAL_TYPE_LABELS[type]}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="h-4" aria-hidden />
+        )}
 
         {suggestions.length === 0 ? (
           <p className="px-6 pb-6 text-sm text-muted-foreground">

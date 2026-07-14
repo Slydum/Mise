@@ -143,12 +143,30 @@ export interface PlannedMeal {
   date: string;
   mealType: MealType;
   recipeId: string;
+  /** True when this slot was filled from a saved leftover rather than picked fresh. */
+  isLeftover?: boolean;
+  /** Links back to the LeftoverEntry that was consumed to fill this slot. */
+  sourceLeftoverId?: string;
 }
 
 export interface DayPlan {
   date: string;
   meals: PlannedMeal[];
 }
+
+/** A saved portion from a completed meal, offered later via "Use leftovers". */
+export interface LeftoverEntry {
+  id: string;
+  recipeId: string;
+  sourceDate: string;
+  sourceMealType: MealType;
+  createdAt: number;
+  consumed: boolean;
+  consumedInto?: { date: string; mealType: MealType };
+}
+
+/** Prefix marking a synthetic Recipe created via "Add custom meal" — never has a prerendered detail/cook page. */
+export const CUSTOM_RECIPE_ID_PREFIX = "custom-";
 
 export interface GroceryItem {
   id: string;

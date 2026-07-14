@@ -1,28 +1,31 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { MoreHorizontal, Plus } from "lucide-react";
 import { MealCard } from "@/components/meal-card";
 import { MealTypeEyebrow } from "@/components/meal-type-eyebrow";
-import type { MealType, Recipe } from "@/lib/types";
+import type { ResolvedMeal } from "@/lib/data/plan-overrides";
+import type { MealType } from "@/lib/types";
 import { MEAL_TYPES } from "@/lib/types";
 
-export interface TodayMenuEntry {
-  id: string;
-  mealType: MealType;
-  recipe: Recipe;
-  completed: boolean;
-}
-
 interface TodayMenuProps {
-  entries: TodayMenuEntry[];
+  entries: ResolvedMeal[];
   onToggle: (mealId: string) => void;
+  onOpenActions: (meal: ResolvedMeal) => void;
   onAddSlot: (mealType: MealType) => void;
   onQuickAdd: () => void;
+  onDayActions: () => void;
 }
 
 /** Today's meals as one continuous, editorial menu rather than a stack of stat cards. */
-export function TodayMenu({ entries, onToggle, onAddSlot, onQuickAdd }: TodayMenuProps) {
-  const byType = new Map<MealType, TodayMenuEntry[]>();
+export function TodayMenu({
+  entries,
+  onToggle,
+  onOpenActions,
+  onAddSlot,
+  onQuickAdd,
+  onDayActions,
+}: TodayMenuProps) {
+  const byType = new Map<MealType, ResolvedMeal[]>();
   for (const entry of entries) {
     byType.set(entry.mealType, [...(byType.get(entry.mealType) ?? []), entry]);
   }
@@ -31,14 +34,24 @@ export function TodayMenu({ entries, onToggle, onAddSlot, onQuickAdd }: TodayMen
     <section aria-label="Today's menu" className="px-5">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="font-serif text-2xl">Today&apos;s Menu</h2>
-        <button
-          type="button"
-          onClick={onQuickAdd}
-          aria-label="Quick add a meal"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-highlight text-highlight-foreground shadow-soft transition-transform duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-90"
-        >
-          <Plus className="size-4.5" aria-hidden />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onDayActions}
+            aria-label="Day options"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring active:bg-muted"
+          >
+            <MoreHorizontal className="size-4.5" aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={onQuickAdd}
+            aria-label="Quick add a meal"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-highlight text-highlight-foreground shadow-soft transition-transform duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-90"
+          >
+            <Plus className="size-4.5" aria-hidden />
+          </button>
+        </div>
       </div>
       <div className="divide-y divide-border/60 rounded-3xl border border-border/60 bg-card px-5 shadow-soft">
         {MEAL_TYPES.map((mealType) => {
@@ -73,6 +86,7 @@ export function TodayMenu({ entries, onToggle, onAddSlot, onQuickAdd }: TodayMen
               mealType={entry.mealType}
               completed={entry.completed}
               onToggleCompleted={() => onToggle(entry.id)}
+              onOpenActions={() => onOpenActions(entry)}
             />
           ));
         })}

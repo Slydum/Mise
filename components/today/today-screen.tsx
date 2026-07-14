@@ -4,35 +4,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ContinueCooking } from "@/components/today/continue-cooking";
 import { GroceryReminder } from "@/components/today/grocery-reminder";
 import { ProgressRings } from "@/components/today/progress-rings";
-import { TodayMenu, type TodayMenuEntry } from "@/components/today/today-menu";
+import { TodayMenu } from "@/components/today/today-menu";
 import { UseSoonStrip } from "@/components/today/use-soon-strip";
 import { DiscoveryRail } from "@/components/discovery-rail";
-import { QuickAddSheet } from "@/components/quick-add-sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  getDayPlan,
-  getGroceryList,
-  getProfile,
-  getRecipes,
-  getSuggestedRecipes,
-  getUseSoonIngredients,
-} from "@/lib/data";
-import {
-  addExtraMeal,
-  addWaterMl,
-  loadActiveCook,
-  loadCheckedItems,
-  loadCompletedMeals,
-  loadExtraMeals,
-  loadWaterMl,
-  saveCompletedMeals,
-  type ActiveCook,
-} from "@/lib/data/local-store";
+import { getGroceryList, getProfile, getRecipes, getSuggestedRecipes, getUseSoonIngredients } from "@/lib/data";
+import { addWaterMl, loadActiveCook, loadCheckedItems, loadWaterMl, type ActiveCook } from "@/lib/data/local-store";
 import { greeting, todayKey } from "@/lib/dates";
 import { useData } from "@/lib/hooks/use-data";
+import { useDayPlan } from "@/lib/hooks/use-day-plan";
 import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useFoodPreferences } from "@/lib/hooks/use-food-preferences";
-import type { MealType, Nutrition, PlannedMeal, Recipe, UseSoonItem } from "@/lib/types";
+import { usePlanSheets } from "@/lib/hooks/use-plan-sheets";
+import type { Nutrition, UseSoonItem } from "@/lib/types";
 
 const EMPTY_NUTRITION: Nutrition = { calories: 0, protein: 0, carbs: 0, fat: 0 };
 const WATER_GLASS_ML = 250;
@@ -47,54 +31,33 @@ export function TodayScreen() {
   const recipes = useData(getRecipes);
   const profile = useData(getProfile);
   const groceryList = useData(getGroceryList);
-  const loadPlan = useCallback(() => getDayPlan(dateKey, dietaryStyle), [dateKey, dietaryStyle]);
-  const plan = useData(loadPlan);
   const loadUseSoon = useCallback(() => getUseSoonIngredients(), []);
   const useSoon = useData(loadUseSoon);
 
-  const [extras, setExtras] = useState<PlannedMeal[]>([]);
-  const [completed, setCompleted] = useState<Record<string, boolean>>({});
+  const dayPlan = useDayPlan(dateKey, dietaryStyle);
+
   const [checkedGrocery, setCheckedGrocery] = useState<Record<string, boolean>>({});
   const [waterMl, setWaterMl] = useState(0);
   const [activeCook, setActiveCook] = useState<ActiveCook | null>(null);
-  const [quickAdd, setQuickAdd] = useState<{ open: boolean; mealType?: MealType }>({
-    open: false,
-  });
 
   // localStorage is client-only; hydrate persisted state after mount so the
   // server-rendered HTML always matches the first client render.
   useEffect(() => {
-    setExtras(loadExtraMeals(dateKey));
-    setCompleted(loadCompletedMeals());
     setCheckedGrocery(loadCheckedItems());
     setWaterMl(loadWaterMl(dateKey));
     setActiveCook(loadActiveCook());
   }, [dateKey]);
 
-  const recipeById = useMemo(
-    () => new Map((recipes ?? []).map((r) => [r.id, r])),
-    [recipes],
-  );
+  const recipeById = useMemo(() => new Map((recipes ?? []).map((r) => [r.id, r])), [recipes]);
 
-  const allMeals = useMemo(() => [...(plan?.meals ?? []), ...extras], [plan, extras]);
-
-  const menuEntries = useMemo<TodayMenuEntry[]>(
-    () =>
-      allMeals.flatMap((meal) => {
-        const recipe = recipeById.get(meal.recipeId);
-        if (!recipe) return [];
-        return [{ id: meal.id, mealType: meal.mealType, recipe, completed: Boolean(completed[meal.id]) }];
-      }),
-    [allMeals, recipeById, completed],
-  );
-
-  const plannedRecipeIds = useMemo(
-    () => Array.from(new Set(allMeals.map((m) => m.recipeId))),
-    [allMeals],
-  );
   const avoidTerms = useMemo(
     () => [...allergies, ...excludedIngredients],
     [allergies, excludedIngredients],
+  );
+
+  const plannedRecipeIds = useMemo(
+    () => Array.from(new Set(dayPlan.meals.map((m) => m.recipeId))),
+    [dayPlan.meals],
   );
   const loadSuggested = useCallback(
     () =>
@@ -111,40 +74,33 @@ export function TodayScreen() {
   const suggested = useData(loadSuggested);
 
   const consumed = useMemo<Nutrition>(() => {
-    return allMeals.reduce((total, meal) => {
-      if (!completed[meal.id]) return total;
-      const recipe = recipeById.get(meal.recipeId);
-      if (!recipe) return total;
+    return dayPlan.meals.reduce((total, meal) => {
+      if (!meal.completed) return total;
       return {
-        calories: total.calories + recipe.nutrition.calories,
-        protein: total.protein + recipe.nutrition.protein,
-        carbs: total.carbs + recipe.nutrition.carbs,
-        fat: total.fat + recipe.nutrition.fat,
+        calories: total.calories + meal.recipe.nutrition.calories,
+        protein: total.protein + meal.recipe.nutrition.protein,
+        carbs: total.carbs + meal.recipe.nutrition.carbs,
+        fat: total.fat + meal.recipe.nutrition.fat,
       };
     }, EMPTY_NUTRITION);
-  }, [allMeals, completed, recipeById]);
-
-  const toggleCompleted = (mealId: string) => {
-    setCompleted((prev) => {
-      const next = { ...prev, [mealId]: !prev[mealId] };
-      saveCompletedMeals(next);
-      return next;
-    });
-  };
-
-  const handleQuickAdd = (mealType: MealType, recipe: Recipe) => {
-    const meal = addExtraMeal(dateKey, mealType, recipe.id);
-    setExtras((prev) => [...prev, meal]);
-  };
+  }, [dayPlan.meals]);
 
   const handleAddWater = () => {
     setWaterMl(addWaterMl(dateKey, WATER_GLASS_ML));
   };
 
+  const planSheets = usePlanSheets({
+    dateKey,
+    dayPlan,
+    dietaryStyle,
+    avoidTerms,
+    boostTerms: favoriteIngredients,
+  });
+
   const groceryRemaining = (groceryList ?? []).filter((item) => !checkedGrocery[item.id]).length;
   const activeCookRecipe = activeCook ? recipeById.get(activeCook.recipeId) : undefined;
 
-  const loading = !plan || !recipes || !profile;
+  const loading = dayPlan.loading || !recipes || !profile;
 
   return (
     <div className="flex flex-col gap-6 pb-6 pt-3 animate-fade-up">
@@ -165,10 +121,12 @@ export function TodayScreen() {
       ) : (
         <>
           <TodayMenu
-            entries={menuEntries}
-            onToggle={toggleCompleted}
-            onAddSlot={(mealType) => setQuickAdd({ open: true, mealType })}
-            onQuickAdd={() => setQuickAdd({ open: true })}
+            entries={dayPlan.meals}
+            onToggle={dayPlan.toggleCompleted}
+            onOpenActions={planSheets.openMealActions}
+            onAddSlot={planSheets.openAddSlot}
+            onQuickAdd={planSheets.openQuickAdd}
+            onDayActions={planSheets.openDayActions}
           />
 
           <ProgressRings
@@ -193,12 +151,8 @@ export function TodayScreen() {
         </>
       )}
 
-      <QuickAddSheet
-        open={quickAdd.open}
-        onOpenChange={(open) => setQuickAdd((prev) => ({ ...prev, open }))}
-        initialMealType={quickAdd.mealType}
-        onAdd={handleQuickAdd}
-      />
+      {planSheets.sheets}
+      {planSheets.toast}
     </div>
   );
 }
