@@ -1,7 +1,6 @@
 import type {
   DayPlan,
   DietaryStyle,
-  GroceryItem,
   MealType,
   PlannedMeal,
   Recipe,
@@ -16,13 +15,8 @@ import {
   scoreRecipe,
   type RankingPreferences,
 } from "@/lib/diet";
-import {
-  mockGroceryItems,
-  mockProfile,
-  mockRecipes,
-  mockUseSoon,
-  weeklyRotation,
-} from "./mock-data";
+import { PRICE_CATALOG, PRICE_CATALOG_META, type PriceCatalogEntry } from "./sm-price-catalog";
+import { mockProfile, mockRecipes, mockUseSoon, weeklyRotation } from "./mock-data";
 
 /**
  * Data provider for Mise.
@@ -143,8 +137,16 @@ export async function getPlanRange(
   );
 }
 
-export async function getGroceryList(): Promise<GroceryItem[]> {
-  return mockGroceryItems;
+export interface PriceCatalog {
+  entries: Record<string, PriceCatalogEntry>;
+  source: string;
+  lastUpdated: string;
+  note: string;
+}
+
+/** SM Markets sample price catalog — a small curated basket, not a live feed (see PRICE_CATALOG_META). */
+export async function getPriceCatalog(): Promise<PriceCatalog> {
+  return { entries: PRICE_CATALOG, ...PRICE_CATALOG_META };
 }
 
 export async function getProfile(): Promise<UserProfile> {

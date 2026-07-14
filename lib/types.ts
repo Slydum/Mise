@@ -54,11 +54,18 @@ export const GROCERY_CATEGORY_ORDER: GroceryCategory[] = [
   "other",
 ];
 
+/** Canonical measurement unit an ingredient amount is expressed in, for merging/conversion across recipes. */
+export type Unit = "g" | "ml" | "pc";
+
 export interface Ingredient {
   id: string;
   name: string;
+  /** Human-readable quantity as written in the recipe (e.g. "2 cloves", "¼ head") — shown as-is on the recipe detail page. */
   quantity: string;
   category: GroceryCategory;
+  /** Numeric quantity in `unit`, for shopping-list aggregation. Converted from `quantity` at authoring time (e.g. "2 cloves" -> 0.2 pc of a garlic bulb, "1 tbsp" -> 15 ml). */
+  amount: number;
+  unit: Unit;
 }
 
 export interface RecipeStep {
@@ -159,15 +166,6 @@ export interface DayPlan {
   meals: PlannedMeal[];
 }
 
-export interface GroceryItem {
-  id: string;
-  name: string;
-  quantity: string;
-  category: GroceryCategory;
-  /** Eating styles this item is compatible with. Omitted means diet-agnostic (produce, pantry, etc). */
-  dietaryStyles?: DietaryStyle[];
-}
-
 /** An ingredient the user already has on hand that's nearing its use-by point. */
 export interface UseSoonItem {
   id: string;
@@ -183,4 +181,8 @@ export interface UserProfile {
   waterGoalMl: number;
   /** Default eating style; the user's actual current choice lives in local-store and can override this. */
   dietaryStyle: DietaryStyle;
+  /** Default weekly grocery budget in PHP; the user's actual value lives in local-store and can override this. */
+  weeklyGroceryBudgetPhp: number;
+  /** Default preferred SM Markets branch; the user's actual choice lives in local-store and can override this. */
+  preferredSmBranch: string;
 }

@@ -8,9 +8,10 @@ import { MealTypeEyebrow } from "@/components/meal-type-eyebrow";
 import { QuickAddSheet } from "@/components/quick-add-sheet";
 import { ScreenHeader } from "@/components/screen-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getDayPlan, getRecipes } from "@/lib/data";
-import { addExtraMeal, loadExtraMeals } from "@/lib/data/local-store";
+import { getPlanRange, getRecipes } from "@/lib/data";
+import { addExtraMeal, loadCompletedMeals, loadExtraMeals } from "@/lib/data/local-store";
 import { addDays, formatShortDate, fromDateKey, isToday, toDateKey, todayKey } from "@/lib/dates";
+import { summarizeDay, type DaySummary } from "@/lib/grocery";
 import { useData } from "@/lib/hooks/use-data";
 import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useFoodPreferences } from "@/lib/hooks/use-food-preferences";
@@ -38,34 +39,53 @@ export function PlanScreen() {
     return Array.from({ length: DAYS_SHOWN }, (_, i) => toDateKey(addDays(startDate, i)));
   }, [start]);
 
-  const [extras, setExtras] = useState<PlannedMeal[]>([]);
+  const [extrasByDate, setExtrasByDate] = useState<Record<string, PlannedMeal[]>>({});
+  const [completed, setCompleted] = useState<Record<string, boolean>>({});
   const [quickAdd, setQuickAdd] = useState<{ open: boolean; mealType?: MealType }>({
     open: false,
   });
 
   const { dietaryStyle } = useDietaryStyle();
-  const { avoidTerms, ranking } = useFoodPreferences();
+  const { avoidTerms, ranking, servings } = useFoodPreferences();
   const recipes = useData(getRecipes);
-  const loadPlan = useCallback(
+  const loadRange = useCallback(
     () =>
-      selected ? getDayPlan(selected, dietaryStyle, { avoidTerms, ranking }) : Promise.resolve(null),
-    [selected, dietaryStyle, avoidTerms, ranking],
+      start
+        ? getPlanRange(start, DAYS_SHOWN, dietaryStyle, { avoidTerms, ranking })
+        : Promise.resolve(null),
+    [start, dietaryStyle, avoidTerms, ranking],
   );
-  const plan = useData(loadPlan);
+  const planRange = useData(loadRange);
+  const plan = useMemo(() => planRange?.find((day) => day.date === selected) ?? null, [planRange, selected]);
+  const extras = (selected && extrasByDate[selected]) || [];
 
+  // localStorage is client-only; hydrate once the range (and its date keys) are known.
   useEffect(() => {
-    if (selected) setExtras(loadExtraMeals(selected));
-  }, [selected]);
+    if (!planRange) return;
+    setExtrasByDate(Object.fromEntries(planRange.map((day) => [day.date, loadExtraMeals(day.date)])));
+    setCompleted(loadCompletedMeals());
+  }, [planRange]);
 
   const recipeById = useMemo(
     () => new Map((recipes ?? []).map((r) => [r.id, r])),
     [recipes],
   );
 
+  const summaries = useMemo(() => {
+    if (!planRange) return undefined;
+    const completedMealIds = new Set(Object.keys(completed).filter((id) => completed[id]));
+    const result: Record<string, DaySummary> = {};
+    for (const day of planRange) {
+      const meals = [...day.meals, ...(extrasByDate[day.date] ?? [])];
+      result[day.date] = summarizeDay(meals, recipeById, completedMealIds, servings);
+    }
+    return result;
+  }, [planRange, extrasByDate, completed, recipeById, servings]);
+
   const handleAdd = (mealType: MealType, recipe: Recipe) => {
     if (!selected) return;
     const meal = addExtraMeal(selected, mealType, recipe.id);
-    setExtras((prev) => [...prev, meal]);
+    setExtrasByDate((prev) => ({ ...prev, [selected]: [...(prev[selected] ?? []), meal] }));
   };
 
   const loading = !plan || !recipes || !selected;
@@ -80,11 +100,11 @@ export function PlanScreen() {
       />
 
       {selected ? (
-        <DaySelector dateKeys={dateKeys} selected={selected} onSelect={setSelected} />
+        <DaySelector dateKeys={dateKeys} selected={selected} onSelect={setSelected} summaries={summaries} />
       ) : (
         <div className="flex gap-2 px-5 py-1" aria-hidden>
           {[0, 1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-16 w-12 rounded-2xl" />
+            <Skeleton key={i} className="h-20 w-16 rounded-2xl" />
           ))}
         </div>
       )}

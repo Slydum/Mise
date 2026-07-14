@@ -11,7 +11,6 @@ import { QuickAddSheet } from "@/components/quick-add-sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   getDayPlan,
-  getGroceryList,
   getProfile,
   getRecipes,
   getSuggestedRecipes,
@@ -21,7 +20,6 @@ import {
   addExtraMeal,
   addWaterMl,
   loadActiveCook,
-  loadCheckedItems,
   loadCompletedMeals,
   loadExtraMeals,
   loadWaterMl,
@@ -32,6 +30,7 @@ import { greeting, todayKey } from "@/lib/dates";
 import { useData } from "@/lib/hooks/use-data";
 import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useFoodPreferences } from "@/lib/hooks/use-food-preferences";
+import { useGroceryList } from "@/lib/hooks/use-grocery-list";
 import type { MealType, Nutrition, PlannedMeal, Recipe, UseSoonItem } from "@/lib/types";
 
 const EMPTY_NUTRITION: Nutrition = { calories: 0, protein: 0, carbs: 0, fat: 0 };
@@ -46,7 +45,7 @@ export function TodayScreen() {
 
   const recipes = useData(getRecipes);
   const profile = useData(getProfile);
-  const groceryList = useData(getGroceryList);
+  const { groceryList, checked: checkedGrocery } = useGroceryList();
   const loadPlan = useCallback(
     () => getDayPlan(dateKey, dietaryStyle, { avoidTerms, ranking }),
     [dateKey, dietaryStyle, avoidTerms, ranking],
@@ -57,7 +56,6 @@ export function TodayScreen() {
 
   const [extras, setExtras] = useState<PlannedMeal[]>([]);
   const [completed, setCompleted] = useState<Record<string, boolean>>({});
-  const [checkedGrocery, setCheckedGrocery] = useState<Record<string, boolean>>({});
   const [waterMl, setWaterMl] = useState(0);
   const [activeCook, setActiveCook] = useState<ActiveCook | null>(null);
   const [quickAdd, setQuickAdd] = useState<{ open: boolean; mealType?: MealType }>({
@@ -69,7 +67,6 @@ export function TodayScreen() {
   useEffect(() => {
     setExtras(loadExtraMeals(dateKey));
     setCompleted(loadCompletedMeals());
-    setCheckedGrocery(loadCheckedItems());
     setWaterMl(loadWaterMl(dateKey));
     setActiveCook(loadActiveCook());
   }, [dateKey]);
@@ -140,7 +137,8 @@ export function TodayScreen() {
     setWaterMl(addWaterMl(dateKey, WATER_GLASS_ML));
   };
 
-  const groceryRemaining = (groceryList ?? []).filter((item) => !checkedGrocery[item.id]).length;
+  const groceryRemaining =
+    groceryList?.lines.filter((line) => !checkedGrocery[line.key]).length ?? 0;
   const activeCookRecipe = activeCook ? recipeById.get(activeCook.recipeId) : undefined;
 
   const loading = !plan || !recipes || !profile;

@@ -26,6 +26,9 @@ const KEYS = {
   servings: "mise.profile.servings.v1",
   calorieGoal: "mise.profile.calorieGoal.v1",
   proteinGoal: "mise.profile.proteinGoal.v1",
+  preferredSmBranch: "mise.profile.preferredSmBranch.v1",
+  weeklyGroceryBudget: "mise.profile.weeklyGroceryBudget.v1",
+  pantryOverrides: "mise.grocery.pantry.v1",
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -242,4 +245,34 @@ export function loadProteinGoal(): number | null {
 
 export function saveProteinGoal(value: number | null): void {
   write(KEYS.proteinGoal, value);
+}
+
+/** `null` means use the profile default. */
+export function loadPreferredSmBranch(): string | null {
+  return read<string | null>(KEYS.preferredSmBranch, null);
+}
+
+export function savePreferredSmBranch(value: string | null): void {
+  write(KEYS.preferredSmBranch, value);
+}
+
+/** `null` means use the profile default. */
+export function loadWeeklyGroceryBudget(): number | null {
+  return read<number | null>(KEYS.weeklyGroceryBudget, null);
+}
+
+export function saveWeeklyGroceryBudget(value: number | null): void {
+  write(KEYS.weeklyGroceryBudget, value);
+}
+
+// Pantry status overrides, keyed by canonical ingredient name -----------------
+// `true` = "I have enough, don't list it"; `false` = "I don't have this,
+// don't apply the pantry-staple default credit"; absent = algorithmic default.
+
+export function loadPantryOverrides(): Record<string, boolean> {
+  return read(KEYS.pantryOverrides, {});
+}
+
+export function savePantryOverrides(map: Record<string, boolean>): void {
+  write(KEYS.pantryOverrides, map);
 }

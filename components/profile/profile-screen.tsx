@@ -14,6 +14,20 @@ import { useData } from "@/lib/hooks/use-data";
 import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useFavorites } from "@/lib/hooks/use-favorites";
 import { useFoodPreferences } from "@/lib/hooks/use-food-preferences";
+import { useShoppingPreferences } from "@/lib/hooks/use-shopping-preferences";
+
+const SM_BRANCHES = [
+  "SM Fairview",
+  "SM North EDSA",
+  "SM Megamall",
+  "SM Mall of Asia",
+  "SM Southmall",
+  "SM Aura Premier",
+  "SM Manila",
+  "SM Marikina",
+  "SM City Cebu",
+  "SM City Davao",
+] as const;
 
 const SETTINGS = [
   { icon: Bell, label: "Notifications", hint: "Meal reminders" },
@@ -49,6 +63,8 @@ export function ProfileScreen() {
     setCalorieGoal,
     setProteinGoal,
   } = useFoodPreferences();
+  const { preferredSmBranch, weeklyGroceryBudget, setPreferredSmBranch, setWeeklyGroceryBudget } =
+    useShoppingPreferences();
   const savedCount = Object.keys(favorites).length;
 
   // Local drafts so clearing a field to retype a new value doesn't
@@ -63,6 +79,9 @@ export function ProfileScreen() {
   const effectiveProteinGoal = proteinGoal ?? profile?.goals.protein ?? 0;
   const [proteinGoalDraft, setProteinGoalDraft] = useState(String(effectiveProteinGoal));
   useEffect(() => setProteinGoalDraft(String(effectiveProteinGoal)), [effectiveProteinGoal]);
+  const effectiveWeeklyBudget = weeklyGroceryBudget ?? profile?.weeklyGroceryBudgetPhp ?? 0;
+  const [weeklyBudgetDraft, setWeeklyBudgetDraft] = useState(String(effectiveWeeklyBudget));
+  useEffect(() => setWeeklyBudgetDraft(String(effectiveWeeklyBudget)), [effectiveWeeklyBudget]);
 
   return (
     <div className="flex flex-col gap-6 animate-fade-up">
@@ -302,6 +321,64 @@ export function ProfileScreen() {
                     <dd className="text-lg font-semibold">{(profile.waterGoalMl / 1000).toFixed(1)} L</dd>
                   </div>
                 </dl>
+              </CardContent>
+            </Card>
+          </section>
+
+          <section className="flex flex-col gap-4">
+            <h2 className="px-1 font-serif text-2xl">Shopping</h2>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-serif text-xl font-normal">SM Markets</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-5">
+                <div>
+                  <label htmlFor="sm-branch" className="mb-2 block text-sm font-medium">
+                    Preferred branch
+                  </label>
+                  <select
+                    id="sm-branch"
+                    value={preferredSmBranch ?? profile.preferredSmBranch}
+                    onChange={(e) => setPreferredSmBranch(e.target.value)}
+                    className="h-11 w-full rounded-2xl border border-border bg-card px-4 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {SM_BRANCHES.map((branch) => (
+                      <option key={branch} value={branch}>
+                        {branch}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="weekly-budget" className="mb-2 block text-sm font-medium">
+                    Weekly grocery budget
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">₱</span>
+                    <Input
+                      id="weekly-budget"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={100}
+                      value={weeklyBudgetDraft}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setWeeklyBudgetDraft(raw);
+                        if (raw === "") setWeeklyGroceryBudget(null);
+                        else if (Number.isFinite(Number(raw)))
+                          setWeeklyGroceryBudget(Math.max(0, Number(raw)));
+                      }}
+                      onBlur={() => setWeeklyBudgetDraft(String(effectiveWeeklyBudget))}
+                      className="max-w-32"
+                    />
+                  </div>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Used to show how much of your weekly budget is left on the Grocery tab.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </section>
