@@ -8,13 +8,14 @@ import { TodayMenu } from "@/components/today/today-menu";
 import { UseSoonStrip } from "@/components/today/use-soon-strip";
 import { DiscoveryRail } from "@/components/discovery-rail";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getGroceryList, getProfile, getRecipes, getSuggestedRecipes, getUseSoonIngredients } from "@/lib/data";
-import { addWaterMl, loadActiveCook, loadCheckedItems, loadWaterMl, type ActiveCook } from "@/lib/data/local-store";
+import { getProfile, getRecipes, getSuggestedRecipes, getUseSoonIngredients } from "@/lib/data";
+import { addWaterMl, loadActiveCook, loadWaterMl, type ActiveCook } from "@/lib/data/local-store";
 import { greeting, todayKey } from "@/lib/dates";
 import { useData } from "@/lib/hooks/use-data";
 import { useDayPlan } from "@/lib/hooks/use-day-plan";
 import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useFoodPreferences } from "@/lib/hooks/use-food-preferences";
+import { useGroceryList } from "@/lib/hooks/use-grocery-list";
 import { usePlanSheets } from "@/lib/hooks/use-plan-sheets";
 import type { Nutrition, UseSoonItem } from "@/lib/types";
 
@@ -30,20 +31,18 @@ export function TodayScreen() {
 
   const recipes = useData(getRecipes);
   const profile = useData(getProfile);
-  const groceryList = useData(getGroceryList);
+  const grocery = useGroceryList(dietaryStyle);
   const loadUseSoon = useCallback(() => getUseSoonIngredients(), []);
   const useSoon = useData(loadUseSoon);
 
   const dayPlan = useDayPlan(dateKey, dietaryStyle);
 
-  const [checkedGrocery, setCheckedGrocery] = useState<Record<string, boolean>>({});
   const [waterMl, setWaterMl] = useState(0);
   const [activeCook, setActiveCook] = useState<ActiveCook | null>(null);
 
   // localStorage is client-only; hydrate persisted state after mount so the
   // server-rendered HTML always matches the first client render.
   useEffect(() => {
-    setCheckedGrocery(loadCheckedItems());
     setWaterMl(loadWaterMl(dateKey));
     setActiveCook(loadActiveCook());
   }, [dateKey]);
@@ -97,7 +96,7 @@ export function TodayScreen() {
     boostTerms: favoriteIngredients,
   });
 
-  const groceryRemaining = (groceryList ?? []).filter((item) => !checkedGrocery[item.id]).length;
+  const groceryRemaining = grocery.items.filter((item) => !grocery.checked[item.id]).length;
   const activeCookRecipe = activeCook ? recipeById.get(activeCook.recipeId) : undefined;
 
   const loading = dayPlan.loading || !recipes || !profile;

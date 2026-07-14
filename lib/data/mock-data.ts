@@ -1,4 +1,4 @@
-import type { GroceryItem, Recipe, UseSoonItem, UserProfile } from "@/lib/types";
+import type { Recipe, UseSoonItem, UserProfile } from "@/lib/types";
 
 /**
  * Mock content for Mise. This file is only imported by the data provider
@@ -437,76 +437,6 @@ export const weeklyRotation: Record<string, [string, string, string, string]> = 
     "roasted-chickpeas",
   ] as [string, string, string, string],
 };
-
-export const mockGroceryItems: GroceryItem[] = [
-  { id: "g-berries", name: "Mixed berries", amount: 300, unit: "g", category: "produce" },
-  { id: "g-avocado", name: "Avocados", amount: 3, unit: "", category: "produce" },
-  { id: "g-banana", name: "Bananas", amount: 1, unit: "bunch", category: "produce" },
-  { id: "g-lemon", name: "Lemons", amount: 4, unit: "", category: "produce" },
-  { id: "g-cucumber", name: "Cucumbers", amount: 2, unit: "", category: "produce" },
-  { id: "g-broccoli", name: "Broccoli", amount: 1, unit: "head", category: "produce" },
-  { id: "g-snap-peas", name: "Snap peas", amount: 150, unit: "g", category: "produce" },
-  { id: "g-pepper", name: "Bell peppers", amount: 3, unit: "", category: "produce" },
-  { id: "g-carrot", name: "Carrots", amount: 1, unit: "bag", category: "produce" },
-  { id: "g-ginger", name: "Fresh ginger", amount: 1, unit: "piece", category: "produce" },
-  { id: "g-cherry-tomatoes", name: "Cherry tomatoes", amount: 200, unit: "g", category: "produce" },
-  { id: "g-red-onion", name: "Red onion", amount: 2, unit: "", category: "produce" },
-  { id: "g-salad-greens", name: "Mixed salad greens", amount: 150, unit: "g", category: "produce" },
-  { id: "g-dill", name: "Fresh dill", amount: 1, unit: "bunch", category: "produce" },
-  {
-    id: "g-chicken",
-    name: "Chicken thighs",
-    amount: 400, unit: "g",
-    category: "protein",
-    dietaryStyles: ["omnivore"],
-  },
-  {
-    id: "g-salmon",
-    name: "Salmon fillets",
-    amount: 2, unit: "",
-    category: "protein",
-    dietaryStyles: ["pescatarian", "omnivore"],
-  },
-  {
-    id: "g-smoked-salmon",
-    name: "Smoked salmon",
-    amount: 200, unit: "g",
-    category: "protein",
-    dietaryStyles: ["pescatarian", "omnivore"],
-  },
-  {
-    id: "g-tuna",
-    name: "Canned tuna",
-    amount: 4, unit: "can",
-    category: "protein",
-    dietaryStyles: ["pescatarian", "omnivore"],
-  },
-  { id: "g-tofu", name: "Firm tofu", amount: 300, unit: "g", category: "protein" },
-  { id: "g-yogurt", name: "Greek yogurt", amount: 1, unit: "kg", category: "dairy" },
-  { id: "g-eggs", name: "Eggs", amount: 1, unit: "dozen", category: "dairy" },
-  { id: "g-feta", name: "Feta", amount: 200, unit: "g", category: "dairy" },
-  { id: "g-almond-milk", name: "Almond milk", amount: 1, unit: "L", category: "dairy" },
-  { id: "g-sourdough", name: "Sourdough loaf", amount: 1, unit: "", category: "grains" },
-  { id: "g-oats", name: "Rolled oats", amount: 500, unit: "g", category: "grains" },
-  { id: "g-quinoa", name: "Quinoa", amount: 500, unit: "g", category: "grains" },
-  { id: "g-rice", name: "Sushi rice", amount: 500, unit: "g", category: "grains" },
-  { id: "g-noodles", name: "Egg noodles", amount: 1, unit: "pack", category: "grains" },
-  { id: "g-lentils", name: "Red lentils", amount: 500, unit: "g", category: "pantry" },
-  { id: "g-chickpeas", name: "Chickpeas (cans)", amount: 3, unit: "", category: "pantry" },
-  { id: "g-olives", name: "Kalamata olives", amount: 1, unit: "jar", category: "pantry" },
-  { id: "g-capers", name: "Capers", amount: 1, unit: "jar", category: "pantry" },
-  { id: "g-coconut-milk", name: "Coconut milk", amount: 2, unit: "can", category: "pantry" },
-  { id: "g-curry-powder", name: "Curry powder", amount: 1, unit: "jar", category: "pantry" },
-  { id: "g-tomatoes", name: "Chopped tomatoes (cans)", amount: 3, unit: "", category: "pantry" },
-  { id: "g-tahini", name: "Tahini", amount: 1, unit: "jar", category: "pantry" },
-  { id: "g-soy", name: "Soy sauce", amount: 1, unit: "bottle", category: "pantry" },
-  { id: "g-olive-oil", name: "Olive oil", amount: 1, unit: "bottle", category: "pantry" },
-  { id: "g-almond-butter", name: "Almond butter", amount: 1, unit: "jar", category: "pantry" },
-  { id: "g-honey", name: "Honey", amount: 1, unit: "jar", category: "pantry" },
-  { id: "g-paprika", name: "Smoked paprika", amount: 1, unit: "jar", category: "pantry" },
-  { id: "g-peas", name: "Frozen peas", amount: 1, unit: "bag", category: "frozen" },
-  { id: "g-foil", name: "Aluminium foil", amount: 1, unit: "roll", category: "other" },
-];
 
 /** Curated stand-in for "what's about to expire" until real pantry tracking exists. */
 export const mockUseSoon: UseSoonItem[] = [

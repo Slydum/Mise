@@ -25,6 +25,7 @@ const KEYS = {
   customRecipes: "mise.recipes.custom.v1",
   leftovers: "mise.leftovers.v1",
   groceryExtra: "mise.grocery.extra.v1",
+  pantryItems: "mise.pantry.v1",
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -56,7 +57,7 @@ export function saveCheckedItems(map: Record<string, boolean>): void {
   write(KEYS.groceryChecked, map);
 }
 
-// Grocery items added manually or from a recipe, on top of the base list ------
+// Grocery items added manually or from a recipe, on top of the generated list -
 
 export function loadExtraGroceryItems(): GroceryItem[] {
   return read(KEYS.groceryExtra, []);
@@ -65,6 +66,44 @@ export function loadExtraGroceryItems(): GroceryItem[] {
 export function addGroceryItems(items: GroceryItem[]): void {
   const all = read<GroceryItem[]>(KEYS.groceryExtra, []);
   write(KEYS.groceryExtra, [...all, ...items]);
+}
+
+export function updateExtraGroceryItem(id: string, patch: Partial<GroceryItem>): void {
+  const all = read<GroceryItem[]>(KEYS.groceryExtra, []);
+  write(
+    KEYS.groceryExtra,
+    all.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+  );
+}
+
+export function removeExtraGroceryItem(id: string): void {
+  const all = read<GroceryItem[]>(KEYS.groceryExtra, []);
+  write(
+    KEYS.groceryExtra,
+    all.filter((item) => item.id !== id),
+  );
+}
+
+// Pantry — ingredients the user always has on hand, excluded from generation --
+
+export function loadPantryItems(): string[] {
+  return read(KEYS.pantryItems, []);
+}
+
+export function addPantryItem(name: string): void {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const all = read<string[]>(KEYS.pantryItems, []);
+  if (all.some((v) => v.toLowerCase() === trimmed.toLowerCase())) return;
+  write(KEYS.pantryItems, [...all, trimmed]);
+}
+
+export function removePantryItem(name: string): void {
+  const all = read<string[]>(KEYS.pantryItems, []);
+  write(
+    KEYS.pantryItems,
+    all.filter((v) => v.toLowerCase() !== name.toLowerCase()),
+  );
 }
 
 // Completed ("eaten") meals ---------------------------------------------------

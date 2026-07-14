@@ -1,7 +1,6 @@
 import type {
   DayPlan,
   DietaryStyle,
-  GroceryItem,
   MealType,
   PlannedMeal,
   Recipe,
@@ -11,13 +10,7 @@ import type {
 import { DEFAULT_DIETARY_STYLE, MEAL_TYPES } from "@/lib/types";
 import { addDays, fromDateKey, toDateKey } from "@/lib/dates";
 import { isRecipeDietCompatible, recipeContainsAnyIngredient } from "@/lib/diet";
-import {
-  mockGroceryItems,
-  mockProfile,
-  mockRecipes,
-  mockUseSoon,
-  weeklyRotation,
-} from "./mock-data";
+import { mockProfile, mockRecipes, mockUseSoon, weeklyRotation } from "./mock-data";
 
 /**
  * Data provider for Mise.
@@ -83,10 +76,6 @@ export async function getPlanRange(
   return Promise.all(
     Array.from({ length: count }, (_, i) => getDayPlan(toDateKey(addDays(start, i)), dietaryStyle)),
   );
-}
-
-export async function getGroceryList(): Promise<GroceryItem[]> {
-  return mockGroceryItems;
 }
 
 export async function getProfile(): Promise<UserProfile> {
