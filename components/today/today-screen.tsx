@@ -17,6 +17,7 @@ import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useFoodPreferences } from "@/lib/hooks/use-food-preferences";
 import { useGroceryList } from "@/lib/hooks/use-grocery-list";
 import { usePlanSheets } from "@/lib/hooks/use-plan-sheets";
+import { useShoppingSettings } from "@/lib/hooks/use-shopping-settings";
 import type { Nutrition, UseSoonItem } from "@/lib/types";
 
 const EMPTY_NUTRITION: Nutrition = { calories: 0, protein: 0, carbs: 0, fat: 0 };
@@ -28,10 +29,11 @@ export function TodayScreen() {
   const [dateKey] = useState(todayKey);
   const { dietaryStyle } = useDietaryStyle();
   const { allergies, excludedIngredients, favoriteIngredients } = useFoodPreferences();
+  const { settings: shoppingSettings } = useShoppingSettings();
 
   const recipes = useData(getRecipes);
   const profile = useData(getProfile);
-  const grocery = useGroceryList(dietaryStyle);
+  const grocery = useGroceryList(dietaryStyle, shoppingSettings.householdSize);
   const loadUseSoon = useCallback(() => getUseSoonIngredients(), []);
   const useSoon = useData(loadUseSoon);
 

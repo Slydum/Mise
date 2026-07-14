@@ -181,9 +181,13 @@ export function hasRecipeContent(recipe: Recipe): boolean {
   return recipe.ingredients.length > 0 || recipe.steps.length > 0;
 }
 
+/** Where an estimated SM price came from, in fallback-priority order (see lib/grocery/price-overrides.ts). */
+export type PriceSource = "manual-sm" | "receipt" | "sm-online";
+
 export interface GroceryItem {
   id: string;
   name: string;
+  /** Purchase quantity — what you'd actually buy (e.g. "2 cans", "1 kg"). */
   amount: number;
   unit: string;
   category: GroceryCategory;
@@ -191,6 +195,23 @@ export interface GroceryItem {
   dietaryStyles?: DietaryStyle[];
   /** Canonical ingredient identity (see lib/grocery/ingredient-catalog.ts), used for pantry matching. Absent on older stored items — callers fall back to deriving it from `name`. */
   canonicalKey?: string;
+  /** Raw quantity the planned recipes need, before rounding up to whole packages. */
+  usageAmount?: number;
+  usageUnit?: string;
+  /** Number of retail packages to buy. */
+  packageCount?: number;
+  packageLabel?: string;
+  packageAmount?: number;
+  packageUnit?: string;
+  /** Estimated PHP price for one package. */
+  estimatedPackagePricePhp?: number;
+  /** packageCount * estimatedPackagePricePhp — the checkout cost, not just the usage-proportional value. */
+  estimatedTotalPricePhp?: number;
+  priceSource?: PriceSource;
+  /** Preferred SM branch this price was sourced from, when known. */
+  branch?: string;
+  /** ISO date the price was last updated. */
+  priceUpdatedAt?: string;
 }
 
 /** An ingredient the user already has on hand that's nearing its use-by point. */
@@ -209,3 +230,23 @@ export interface UserProfile {
   /** Default eating style; the user's actual current choice lives in local-store and can override this. */
   dietaryStyle: DietaryStyle;
 }
+
+export type PricingMode = "normal" | "conservative";
+
+/** Shopping preferences, kept local-first like dietary style and food preferences (see lib/data/local-store.ts). */
+export interface ShoppingSettings {
+  preferredSupermarket: string;
+  preferredBranch: string;
+  weeklyBudgetPhp: number;
+  pricingMode: PricingMode;
+  /** People the grocery list should be scaled to feed — drives servingsRatio in lib/data/grocery-generator.ts. */
+  householdSize: number;
+}
+
+export const DEFAULT_SHOPPING_SETTINGS: ShoppingSettings = {
+  preferredSupermarket: "SM Markets",
+  preferredBranch: "",
+  weeklyBudgetPhp: 3000,
+  pricingMode: "normal",
+  householdSize: 2,
+};

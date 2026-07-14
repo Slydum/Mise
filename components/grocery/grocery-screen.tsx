@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Package, Pencil, Plus, Share2 } from "lucide-react";
 import { AddGroceryItemSheet } from "@/components/grocery/add-grocery-item-sheet";
 import { PantrySheet } from "@/components/grocery/pantry-sheet";
+import { PriceDetailSheet } from "@/components/grocery/price-detail-sheet";
 import { ScreenHeader } from "@/components/screen-header";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,7 +13,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Toast } from "@/components/ui/toast";
 import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useGroceryList } from "@/lib/hooks/use-grocery-list";
+import { useShoppingSettings } from "@/lib/hooks/use-shopping-settings";
 import { useToast } from "@/lib/hooks/use-toast";
+import { isPricingFresh, summarizeBasket } from "@/lib/grocery/basket";
+import { formatApproxPhp, formatPhp } from "@/lib/grocery/currency";
 import { formatQuantity } from "@/lib/ingredients";
 import type { GroceryCategory, GroceryItem } from "@/lib/types";
 import { DIETARY_STYLE_LABELS, GROCERY_CATEGORY_LABELS, GROCERY_CATEGORY_ORDER } from "@/lib/types";
@@ -32,13 +36,15 @@ const MANUAL_ID_PREFIX = "extra-manual-";
 
 export function GroceryScreen() {
   const { dietaryStyle } = useDietaryStyle();
-  const grocery = useGroceryList(dietaryStyle);
+  const { settings: shoppingSettings } = useShoppingSettings();
+  const grocery = useGroceryList(dietaryStyle, shoppingSettings.householdSize);
   const { message: toastMessage, showToast } = useToast();
 
   const [hideCompleted, setHideCompleted] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<GroceryItem | null>(null);
   const [pantryOpen, setPantryOpen] = useState(false);
+  const [priceDetailItem, setPriceDetailItem] = useState<GroceryItem | null>(null);
 
   const sections = useMemo(() => {
     const byCategory = new Map<GroceryCategory, GroceryItem[]>();
@@ -56,6 +62,26 @@ export function GroceryScreen() {
   const total = grocery.items.length;
   const doneCount = grocery.items.filter((i) => grocery.checked[i.id]).length;
   const anyChecked = doneCount > 0;
+
+  const basket = useMemo(
+    () => summarizeBasket(grocery.items, shoppingSettings.weeklyBudgetPhp),
+    [grocery.items, shoppingSettings.weeklyBudgetPhp],
+  );
+  const pricingFresh = isPricingFresh(basket.mostRecentPriceUpdatedAt);
+
+  const budgetStatus =
+    shoppingSettings.weeklyBudgetPhp > 0
+      ? basket.budgetDeltaPhp >= 0
+        ? `${formatPhp(basket.budgetDeltaPhp)} under your ${formatPhp(basket.budgetPhp)} weekly budget`
+        : `${formatPhp(Math.abs(basket.budgetDeltaPhp))} over your ${formatPhp(basket.budgetPhp)} weekly budget`
+      : null;
+
+  const priceStatus =
+    basket.unpricedCount > 0
+      ? `${basket.unpricedCount} item${basket.unpricedCount === 1 ? "" : "s"} need${basket.unpricedCount === 1 ? "s" : ""} a price`
+      : pricingFresh
+        ? "Prices updated recently"
+        : "Prices may be outdated";
 
   const handleShare = async () => {
     const remaining = grocery.items.filter((i) => !grocery.checked[i.id]);
@@ -125,7 +151,16 @@ export function GroceryScreen() {
         </div>
       ) : (
         <>
-          <div className="mx-5 flex flex-col gap-3 rounded-3xl border border-border/60 bg-card p-6 shadow-soft">
+          <div className="mx-5 flex flex-col gap-4 rounded-3xl border border-border/60 bg-card p-6 shadow-soft">
+            {total > 0 ? (
+              <div className="flex flex-col gap-1 border-b border-border/60 pb-4">
+                <p className="text-sm font-medium text-muted-foreground">Estimated SM total</p>
+                <p className="font-serif text-3xl tracking-tight">{formatApproxPhp(basket.totalPhp)}</p>
+                {budgetStatus ? <p className="text-sm text-muted-foreground">{budgetStatus}</p> : null}
+                <p className="text-xs text-muted-foreground">{priceStatus}</p>
+              </div>
+            ) : null}
+
             <div className="flex items-baseline justify-between">
               <p className="font-serif text-lg">
                 {doneCount} of {total} items
@@ -193,6 +228,10 @@ export function GroceryScreen() {
                         const isChecked = Boolean(grocery.checked[item.id]);
                         const quantity = formatQuantity(item.amount, item.unit);
                         const isManual = item.id.startsWith(MANUAL_ID_PREFIX);
+                        const priceLabel =
+                          item.estimatedTotalPricePhp !== undefined
+                            ? formatApproxPhp(item.estimatedTotalPricePhp)
+                            : undefined;
                         return (
                           <li key={item.id} className={cn(index > 0 && "border-t border-border/60")}>
                             <div
@@ -201,12 +240,17 @@ export function GroceryScreen() {
                                 isChecked && "opacity-60",
                               )}
                             >
-                              <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3.5">
-                                <Checkbox
-                                  checked={isChecked}
-                                  onCheckedChange={() => grocery.toggleChecked(item.id)}
-                                  aria-label={`${item.name}, ${quantity}`}
-                                />
+                              <Checkbox
+                                checked={isChecked}
+                                onCheckedChange={() => grocery.toggleChecked(item.id)}
+                                aria-label={`${item.name}, ${quantity}`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setPriceDetailItem(item)}
+                                className="flex min-w-0 flex-1 items-center gap-3.5 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                aria-label={`View price details for ${item.name}`}
+                              >
                                 <span
                                   className={cn(
                                     "min-w-0 flex-1 truncate font-medium transition-all duration-150",
@@ -215,8 +259,13 @@ export function GroceryScreen() {
                                 >
                                   {item.name}
                                 </span>
-                              </label>
-                              <span className="shrink-0 text-sm text-muted-foreground">{quantity}</span>
+                              </button>
+                              <div className="flex shrink-0 flex-col items-end">
+                                <span className="text-sm text-muted-foreground">{quantity}</span>
+                                {priceLabel ? (
+                                  <span className="text-xs text-muted-foreground/80">{priceLabel}</span>
+                                ) : null}
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => handleAddToPantry(item)}
@@ -281,6 +330,20 @@ export function GroceryScreen() {
         onRemove={(name) => {
           grocery.removeFromPantry(name);
           showToast(`${name} removed from pantry`);
+        }}
+      />
+
+      <PriceDetailSheet
+        open={priceDetailItem !== null}
+        onOpenChange={(open) => {
+          if (!open) setPriceDetailItem(null);
+        }}
+        item={priceDetailItem}
+        onSavePrice={(pricePhp) => {
+          if (priceDetailItem) {
+            grocery.updatePrice(priceDetailItem, pricePhp);
+            showToast("Price updated");
+          }
         }}
       />
 

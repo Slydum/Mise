@@ -2,6 +2,7 @@
 
 import { Bell, ChevronRight, CloudOff, Heart, Ruler, Palette } from "lucide-react";
 import { DietStyleSelector } from "@/components/profile/diet-style-selector";
+import { ShoppingSettingsCard } from "@/components/profile/shopping-settings-card";
 import { TagEditor } from "@/components/profile/tag-editor";
 import { ScreenHeader } from "@/components/screen-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import { useData } from "@/lib/hooks/use-data";
 import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useFavorites } from "@/lib/hooks/use-favorites";
 import { useFoodPreferences } from "@/lib/hooks/use-food-preferences";
+import { useShoppingSettings } from "@/lib/hooks/use-shopping-settings";
 import { useToast } from "@/lib/hooks/use-toast";
 import type { DietaryStyle } from "@/lib/types";
 
@@ -36,6 +38,7 @@ export function ProfileScreen() {
     addFavorite,
     removeFavorite,
   } = useFoodPreferences();
+  const { settings: shoppingSettings, updateSettings: updateShoppingSettings } = useShoppingSettings();
   const savedCount = Object.keys(favorites).length;
   const { message: toastMessage, showToast } = useToast();
 
@@ -175,6 +178,21 @@ export function ProfileScreen() {
                     <dd className="text-lg font-semibold">{(profile.waterGoalMl / 1000).toFixed(1)} L</dd>
                   </div>
                 </dl>
+              </CardContent>
+            </Card>
+          </section>
+
+          <section className="flex flex-col gap-4">
+            <h2 className="px-1 font-serif text-2xl">Shopping</h2>
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-serif text-xl font-normal">SM Markets &amp; budget</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ShoppingSettingsCard
+                  settings={shoppingSettings}
+                  onChange={withToast(updateShoppingSettings)}
+                />
               </CardContent>
             </Card>
           </section>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { generateGroceryItems } from "@/lib/data/grocery-generator";
 import { filterOutPantryItems } from "@/lib/grocery/aggregate";
 import { getCanonicalKey } from "@/lib/grocery/ingredient-catalog";
+import { overrideId, type PriceOverride } from "@/lib/grocery/price-overrides";
 import {
   addGroceryItems,
   addPantryItem,
@@ -13,6 +14,7 @@ import {
   removeExtraGroceryItem,
   removePantryItem,
   saveCheckedItems,
+  savePriceOverride,
   updateExtraGroceryItem,
 } from "@/lib/data/local-store";
 import type { DietaryStyle, GroceryItem } from "@/lib/types";
@@ -29,15 +31,19 @@ export interface UseGroceryListResult {
   removeItem: (id: string) => void;
   addToPantry: (name: string) => void;
   removeFromPantry: (name: string) => void;
+  /** Corrects an item's estimated price. Persists by canonical key + package/branch, so it survives the next regeneration even for plan-derived (non-manual) items. */
+  updatePrice: (item: GroceryItem, pricePhp: number) => void;
   refresh: () => void;
 }
 
 /**
- * The grocery list: items generated from the next 7 days' plan, plus
- * manually-added/recipe-added extras, minus anything pantry-owned — merged
- * into one flat list for the Grocery screen to group and render.
+ * The grocery list: items generated from the next 7 days' plan (scaled to
+ * `desiredServings`, priced against the SM catalog and any manual
+ * corrections), plus manually-added/recipe-added extras, minus anything
+ * pantry-owned — merged into one flat list for the Grocery screen to group
+ * and render.
  */
-export function useGroceryList(dietaryStyle: DietaryStyle): UseGroceryListResult {
+export function useGroceryList(dietaryStyle: DietaryStyle, desiredServings: number): UseGroceryListResult {
   const [generated, setGenerated] = useState<GroceryItem[]>([]);
   const [extra, setExtra] = useState<GroceryItem[]>([]);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
@@ -50,7 +56,7 @@ export function useGroceryList(dietaryStyle: DietaryStyle): UseGroceryListResult
   useEffect(() => {
     let active = true;
     setLoading(true);
-    generateGroceryItems(dietaryStyle).then((result) => {
+    generateGroceryItems(dietaryStyle, desiredServings).then((result) => {
       if (active) {
         setGenerated(result);
         setLoading(false);
@@ -62,7 +68,7 @@ export function useGroceryList(dietaryStyle: DietaryStyle): UseGroceryListResult
     return () => {
       active = false;
     };
-  }, [dietaryStyle, reloadToken]);
+  }, [dietaryStyle, desiredServings, reloadToken]);
 
   const items = useMemo(() => {
     const merged = [...generated, ...extra].map((item) => ({
@@ -126,6 +132,27 @@ export function useGroceryList(dietaryStyle: DietaryStyle): UseGroceryListResult
     [refresh],
   );
 
+  const updatePrice = useCallback(
+    (item: GroceryItem, pricePhp: number) => {
+      const canonicalKey = item.canonicalKey ?? getCanonicalKey(item.name);
+      const context = { packageAmount: item.packageAmount, packageUnit: item.packageUnit, branch: item.branch };
+      const override: PriceOverride = {
+        id: overrideId(canonicalKey, context),
+        canonicalKey,
+        pricePhp,
+        priceSource: "manual-sm",
+        packageAmount: item.packageAmount,
+        packageUnit: item.packageUnit,
+        productName: item.packageLabel,
+        branch: item.branch,
+        updatedAt: new Date().toISOString(),
+      };
+      savePriceOverride(override);
+      refresh();
+    },
+    [refresh],
+  );
+
   return {
     items,
     loading,
@@ -138,6 +165,7 @@ export function useGroceryList(dietaryStyle: DietaryStyle): UseGroceryListResult
     removeItem,
     addToPantry,
     removeFromPantry,
+    updatePrice,
     refresh,
   };
 }
