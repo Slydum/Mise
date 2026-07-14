@@ -57,7 +57,10 @@ export const GROCERY_CATEGORY_ORDER: GroceryCategory[] = [
 export interface Ingredient {
   id: string;
   name: string;
-  quantity: string;
+  /** Scalable quantity — multiply by a servings ratio and format with lib/ingredients.ts. */
+  amount: number;
+  /** Singular unit, e.g. "g", "clove", "" for a bare count. Pluralized at display time. */
+  unit: string;
   category: GroceryCategory;
 }
 
@@ -171,7 +174,8 @@ export const CUSTOM_RECIPE_ID_PREFIX = "custom-";
 export interface GroceryItem {
   id: string;
   name: string;
-  quantity: string;
+  amount: number;
+  unit: string;
   category: GroceryCategory;
   /** Eating styles this item is compatible with. Omitted means diet-agnostic (produce, pantry, etc). */
   dietaryStyles?: DietaryStyle[];

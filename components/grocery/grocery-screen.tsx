@@ -7,7 +7,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getGroceryList } from "@/lib/data";
-import { loadCheckedItems, saveCheckedItems } from "@/lib/data/local-store";
+import { loadCheckedItems, loadExtraGroceryItems, saveCheckedItems } from "@/lib/data/local-store";
+import { formatQuantity } from "@/lib/ingredients";
 import { useData } from "@/lib/hooks/use-data";
 import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import type { GroceryCategory, GroceryItem } from "@/lib/types";
@@ -25,19 +26,26 @@ const CATEGORY_EMOJI: Record<GroceryCategory, string> = {
 };
 
 export function GroceryScreen() {
-  const allItems = useData(getGroceryList);
+  const baseItems = useData(getGroceryList);
   const { dietaryStyle } = useDietaryStyle();
-  const items = useMemo(
-    () =>
-      allItems?.filter((item) => !item.dietaryStyles || item.dietaryStyles.includes(dietaryStyle)),
-    [allItems, dietaryStyle],
-  );
+  const [extraItems, setExtraItems] = useState<GroceryItem[]>([]);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
 
   // Persisted state is client-only; hydrate after mount.
   useEffect(() => {
     setChecked(loadCheckedItems());
+    setExtraItems(loadExtraGroceryItems());
   }, []);
+
+  const allItems = useMemo(
+    () => (baseItems ? [...baseItems, ...extraItems] : null),
+    [baseItems, extraItems],
+  );
+  const items = useMemo(
+    () =>
+      allItems?.filter((item) => !item.dietaryStyles || item.dietaryStyles.includes(dietaryStyle)),
+    [allItems, dietaryStyle],
+  );
 
   const toggle = (id: string) => {
     setChecked((prev) => {
@@ -116,6 +124,7 @@ export function GroceryScreen() {
                 <ul className="overflow-hidden rounded-3xl border border-border/60 bg-card shadow-soft">
                   {sectionItems.map((item, index) => {
                     const isChecked = Boolean(checked[item.id]);
+                    const quantity = formatQuantity(item.amount, item.unit);
                     return (
                       <li
                         key={item.id}
@@ -130,7 +139,7 @@ export function GroceryScreen() {
                           <Checkbox
                             checked={isChecked}
                             onCheckedChange={() => toggle(item.id)}
-                            aria-label={`${item.name}, ${item.quantity}`}
+                            aria-label={`${item.name}, ${quantity}`}
                           />
                           <span
                             className={cn(
@@ -140,7 +149,7 @@ export function GroceryScreen() {
                           >
                             {item.name}
                           </span>
-                          <span className="text-sm text-muted-foreground">{item.quantity}</span>
+                          <span className="text-sm text-muted-foreground">{quantity}</span>
                         </label>
                       </li>
                     );

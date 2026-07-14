@@ -1,4 +1,4 @@
-import type { DietaryStyle, LeftoverEntry, MealType, PlannedMeal, Recipe } from "@/lib/types";
+import type { DietaryStyle, GroceryItem, LeftoverEntry, MealType, PlannedMeal, Recipe } from "@/lib/types";
 import { DEFAULT_DIETARY_STYLE } from "@/lib/types";
 
 /**
@@ -24,6 +24,7 @@ const KEYS = {
   planRegenSeed: "mise.plan.regenSeed.v1",
   customRecipes: "mise.recipes.custom.v1",
   leftovers: "mise.leftovers.v1",
+  groceryExtra: "mise.grocery.extra.v1",
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -53,6 +54,17 @@ export function loadCheckedItems(): Record<string, boolean> {
 
 export function saveCheckedItems(map: Record<string, boolean>): void {
   write(KEYS.groceryChecked, map);
+}
+
+// Grocery items added manually or from a recipe, on top of the base list ------
+
+export function loadExtraGroceryItems(): GroceryItem[] {
+  return read(KEYS.groceryExtra, []);
+}
+
+export function addGroceryItems(items: GroceryItem[]): void {
+  const all = read<GroceryItem[]>(KEYS.groceryExtra, []);
+  write(KEYS.groceryExtra, [...all, ...items]);
 }
 
 // Completed ("eaten") meals ---------------------------------------------------
