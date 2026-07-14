@@ -189,6 +189,8 @@ export interface GroceryItem {
   category: GroceryCategory;
   /** Eating styles this item is compatible with. Omitted means diet-agnostic (produce, pantry, etc). */
   dietaryStyles?: DietaryStyle[];
+  /** Canonical ingredient identity (see lib/grocery/ingredient-catalog.ts), used for pantry matching. Absent on older stored items — callers fall back to deriving it from `name`. */
+  canonicalKey?: string;
 }
 
 /** An ingredient the user already has on hand that's nearing its use-by point. */

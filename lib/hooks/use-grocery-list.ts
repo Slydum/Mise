@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { generateGroceryItems, normalizeIngredientName } from "@/lib/data/grocery-generator";
+import { generateGroceryItems } from "@/lib/data/grocery-generator";
+import { filterOutPantryItems } from "@/lib/grocery/aggregate";
+import { getCanonicalKey } from "@/lib/grocery/ingredient-catalog";
 import {
   addGroceryItems,
   addPantryItem,
@@ -63,8 +65,11 @@ export function useGroceryList(dietaryStyle: DietaryStyle): UseGroceryListResult
   }, [dietaryStyle, reloadToken]);
 
   const items = useMemo(() => {
-    const pantry = new Set(pantryItems.map(normalizeIngredientName));
-    return [...generated, ...extra].filter((item) => !pantry.has(normalizeIngredientName(item.name)));
+    const merged = [...generated, ...extra].map((item) => ({
+      ...item,
+      canonicalKey: item.canonicalKey ?? getCanonicalKey(item.name),
+    }));
+    return filterOutPantryItems(merged, pantryItems);
   }, [generated, extra, pantryItems]);
 
   const toggleChecked = useCallback((id: string) => {
@@ -82,7 +87,8 @@ export function useGroceryList(dietaryStyle: DietaryStyle): UseGroceryListResult
 
   const addItem = useCallback(
     (item: Omit<GroceryItem, "id">) => {
-      addGroceryItems([{ ...item, id: `extra-manual-${Date.now()}` }]);
+      const canonicalKey = item.canonicalKey ?? getCanonicalKey(item.name);
+      addGroceryItems([{ ...item, canonicalKey, id: `extra-manual-${Date.now()}` }]);
       refresh();
     },
     [refresh],
