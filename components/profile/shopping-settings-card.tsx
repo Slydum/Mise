@@ -1,6 +1,8 @@
 "use client";
 
-import { Minus, Plus } from "lucide-react";
+import { useState } from "react";
+import { MapPin, Minus, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { PricingMode, ShoppingSettings } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -8,6 +10,7 @@ import { cn } from "@/lib/utils";
 interface ShoppingSettingsCardProps {
   settings: ShoppingSettings;
   onChange: (patch: Partial<ShoppingSettings>) => void;
+  onSetStore: (storeName: string, storeCity: string, storeAddress?: string) => void;
 }
 
 const PRICING_MODES: { value: PricingMode; label: string; hint: string }[] = [
@@ -15,26 +18,79 @@ const PRICING_MODES: { value: PricingMode; label: string; hint: string }[] = [
   { value: "conservative", label: "Conservative", hint: "Rounds up for price swings" },
 ];
 
-/** Preferred supermarket/branch, weekly budget, pricing mode, and household size — feeds the Grocery screen's SM price estimate. */
-export function ShoppingSettingsCard({ settings, onChange }: ShoppingSettingsCardProps) {
+/** Exact SM store, weekly budget, pricing mode, and household size — feeds the Grocery screen's pricing. Store is required before any pricing is shown; "SM Markets" alone is never treated as a price location. */
+export function ShoppingSettingsCard({ settings, onChange, onSetStore }: ShoppingSettingsCardProps) {
+  const [editingStore, setEditingStore] = useState(!settings.store);
+  const [name, setName] = useState(settings.store?.storeName ?? "");
+  const [city, setCity] = useState(settings.store?.storeCity ?? "");
+  const [address, setAddress] = useState(settings.store?.storeAddress ?? "");
+
+  const canSaveStore = name.trim().length > 0 && city.trim().length > 0;
+
+  const handleSaveStore = () => {
+    if (!canSaveStore) return;
+    onSetStore(name, city, address);
+    setEditingStore(false);
+  };
+
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <p className="mb-1.5 text-sm font-medium text-muted-foreground">Preferred supermarket</p>
-        <Input value={settings.preferredSupermarket} disabled aria-label="Preferred supermarket" />
-      </div>
-
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-muted-foreground" htmlFor="sm-branch">
-          Preferred branch or area
-        </label>
-        <Input
-          id="sm-branch"
-          placeholder="e.g. SM Fairview"
-          defaultValue={settings.preferredBranch}
-          onBlur={(e) => onChange({ preferredBranch: e.target.value.trim() })}
-          aria-label="Preferred SM branch or area"
-        />
+        <p className="mb-1.5 text-sm font-medium text-muted-foreground">SM store</p>
+        {!editingStore && settings.store ? (
+          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+              <MapPin className="size-4.5" aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium">{settings.store.storeName}</p>
+              <p className="truncate text-sm text-muted-foreground">
+                {settings.store.storeCity}
+                {settings.store.storeAddress ? ` · ${settings.store.storeAddress}` : ""}
+              </p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setEditingStore(true)}>
+              Change
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+            {!settings.store ? (
+              <p className="text-sm text-muted-foreground">
+                Pricing needs your exact branch — "SM Markets" alone isn't specific enough. Enter the store you
+                actually shop at.
+              </p>
+            ) : null}
+            <Input
+              placeholder="Store name, e.g. SM Supermarket Fairview"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              aria-label="SM store name"
+            />
+            <Input
+              placeholder="City / area, e.g. Quezon City"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              aria-label="SM store city or area"
+            />
+            <Input
+              placeholder="Address (optional)"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              aria-label="SM store address"
+            />
+            <div className="flex gap-2">
+              {settings.store ? (
+                <Button variant="ghost" className="flex-1" onClick={() => setEditingStore(false)}>
+                  Cancel
+                </Button>
+              ) : null}
+              <Button className="flex-1" onClick={handleSaveStore} disabled={!canSaveStore}>
+                Save store
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div>

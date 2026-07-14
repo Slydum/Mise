@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Package, Pencil, Plus, Share2 } from "lucide-react";
+import { MapPin, Package, Pencil, Plus, Share2 } from "lucide-react";
+import Link from "next/link";
 import { AddGroceryItemSheet } from "@/components/grocery/add-grocery-item-sheet";
 import { PantrySheet } from "@/components/grocery/pantry-sheet";
 import { PriceDetailSheet } from "@/components/grocery/price-detail-sheet";
@@ -15,11 +16,11 @@ import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useGroceryList } from "@/lib/hooks/use-grocery-list";
 import { useShoppingSettings } from "@/lib/hooks/use-shopping-settings";
 import { useToast } from "@/lib/hooks/use-toast";
-import { isPricingFresh, summarizeBasket } from "@/lib/grocery/basket";
+import { deriveBasketStatus, summarizeBasket, type BasketStatus } from "@/lib/grocery/basket";
 import { formatApproxPhp, formatPhp } from "@/lib/grocery/currency";
 import { formatQuantity } from "@/lib/ingredients";
 import type { GroceryCategory, GroceryItem } from "@/lib/types";
-import { DIETARY_STYLE_LABELS, GROCERY_CATEGORY_LABELS, GROCERY_CATEGORY_ORDER } from "@/lib/types";
+import { GROCERY_CATEGORY_LABELS, GROCERY_CATEGORY_ORDER } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_EMOJI: Record<GroceryCategory, string> = {
@@ -32,12 +33,21 @@ const CATEGORY_EMOJI: Record<GroceryCategory, string> = {
   other: "🧺",
 };
 
+const BASKET_STATUS_LABELS: Record<BasketStatus, string> = {
+  live: "Live SM basket",
+  "recently-checked": "Recently checked SM basket",
+  "partially-available": "Partially available",
+  "refresh-required": "Refresh required",
+  unavailable: "Live prices unavailable",
+};
+
 const MANUAL_ID_PREFIX = "extra-manual-";
 
 export function GroceryScreen() {
   const { dietaryStyle } = useDietaryStyle();
   const { settings: shoppingSettings } = useShoppingSettings();
-  const grocery = useGroceryList(dietaryStyle, shoppingSettings.householdSize);
+  const store = shoppingSettings.store;
+  const grocery = useGroceryList(dietaryStyle, shoppingSettings.householdSize, store?.storeId ?? null);
   const { message: toastMessage, showToast } = useToast();
 
   const [hideCompleted, setHideCompleted] = useState(false);
@@ -67,21 +77,14 @@ export function GroceryScreen() {
     () => summarizeBasket(grocery.items, shoppingSettings.weeklyBudgetPhp),
     [grocery.items, shoppingSettings.weeklyBudgetPhp],
   );
-  const pricingFresh = isPricingFresh(basket.mostRecentPriceUpdatedAt);
+  const basketStatus = useMemo(() => deriveBasketStatus(grocery.items), [grocery.items]);
 
   const budgetStatus =
-    shoppingSettings.weeklyBudgetPhp > 0
+    basket.budgetDeltaPhp !== null
       ? basket.budgetDeltaPhp >= 0
         ? `${formatPhp(basket.budgetDeltaPhp)} under your ${formatPhp(basket.budgetPhp)} weekly budget`
         : `${formatPhp(Math.abs(basket.budgetDeltaPhp))} over your ${formatPhp(basket.budgetPhp)} weekly budget`
       : null;
-
-  const priceStatus =
-    basket.unpricedCount > 0
-      ? `${basket.unpricedCount} item${basket.unpricedCount === 1 ? "" : "s"} need${basket.unpricedCount === 1 ? "s" : ""} a price`
-      : pricingFresh
-        ? "Prices updated recently"
-        : "Prices may be outdated";
 
   const handleShare = async () => {
     const remaining = grocery.items.filter((i) => !grocery.checked[i.id]);
@@ -122,7 +125,10 @@ export function GroceryScreen() {
 
   return (
     <div className="flex flex-col gap-6 animate-fade-up">
-      <ScreenHeader title="Grocery" subtitle={`Next 7 days · ${DIETARY_STYLE_LABELS[dietaryStyle]}`}>
+      <ScreenHeader
+        title="Grocery"
+        subtitle={store ? `SM Markets — ${store.storeName}` : "Select your SM store in Profile"}
+      >
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" onClick={() => setPantryOpen(true)} aria-label="My Pantry">
             <Package className="size-5" aria-hidden />
@@ -144,6 +150,23 @@ export function GroceryScreen() {
         </div>
       </ScreenHeader>
 
+      {!store ? (
+        <Link
+          href="/profile"
+          className="mx-5 flex items-center gap-3 rounded-3xl border border-dashed border-border bg-card px-5 py-4 text-left shadow-soft outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring active:bg-muted"
+        >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+            <MapPin className="size-4.5" aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium">Select your SM store to see pricing</span>
+            <span className="block text-sm text-muted-foreground">
+              "SM Markets" alone isn't specific enough — pick your exact branch in Profile.
+            </span>
+          </span>
+        </Link>
+      ) : null}
+
       {grocery.loading ? (
         <div className="flex flex-col gap-4 px-5" aria-hidden>
           <Skeleton className="h-24 rounded-3xl" />
@@ -154,10 +177,16 @@ export function GroceryScreen() {
           <div className="mx-5 flex flex-col gap-4 rounded-3xl border border-border/60 bg-card p-6 shadow-soft">
             {total > 0 ? (
               <div className="flex flex-col gap-1 border-b border-border/60 pb-4">
-                <p className="text-sm font-medium text-muted-foreground">Estimated SM total</p>
-                <p className="font-serif text-3xl tracking-tight">{formatApproxPhp(basket.totalPhp)}</p>
+                <p className="text-sm font-medium text-muted-foreground">{BASKET_STATUS_LABELS[basketStatus]}</p>
+                {basket.livePricedCount > 0 ? (
+                  <p className="font-serif text-3xl tracking-tight">{formatApproxPhp(basket.liveTotalPhp)}</p>
+                ) : (
+                  <p className="font-serif text-xl tracking-tight text-muted-foreground">No live prices yet</p>
+                )}
                 {budgetStatus ? <p className="text-sm text-muted-foreground">{budgetStatus}</p> : null}
-                <p className="text-xs text-muted-foreground">{priceStatus}</p>
+                <p className="text-xs text-muted-foreground">
+                  {basket.livePricedCount} of {basket.totalItems} priced live · {basket.unavailableCount} unavailable
+                </p>
               </div>
             ) : null}
 
@@ -228,9 +257,9 @@ export function GroceryScreen() {
                         const isChecked = Boolean(grocery.checked[item.id]);
                         const quantity = formatQuantity(item.amount, item.unit);
                         const isManual = item.id.startsWith(MANUAL_ID_PREFIX);
-                        const priceLabel =
-                          item.estimatedTotalPricePhp !== undefined
-                            ? formatApproxPhp(item.estimatedTotalPricePhp)
+                        const lastPaidLabel =
+                          item.lastPaidPricePhp !== undefined
+                            ? `Last paid ${formatApproxPhp(item.lastPaidPricePhp)}`
                             : undefined;
                         return (
                           <li key={item.id} className={cn(index > 0 && "border-t border-border/60")}>
@@ -262,8 +291,8 @@ export function GroceryScreen() {
                               </button>
                               <div className="flex shrink-0 flex-col items-end">
                                 <span className="text-sm text-muted-foreground">{quantity}</span>
-                                {priceLabel ? (
-                                  <span className="text-xs text-muted-foreground/80">{priceLabel}</span>
+                                {lastPaidLabel ? (
+                                  <span className="text-xs text-muted-foreground/80">{lastPaidLabel}</span>
                                 ) : null}
                               </div>
                               <button
@@ -339,10 +368,11 @@ export function GroceryScreen() {
           if (!open) setPriceDetailItem(null);
         }}
         item={priceDetailItem}
-        onSavePrice={(pricePhp) => {
+        storeName={store?.storeName}
+        onLogPrice={(pricePhp) => {
           if (priceDetailItem) {
-            grocery.updatePrice(priceDetailItem, pricePhp);
-            showToast("Price updated");
+            grocery.logPurchasePrice(priceDetailItem, pricePhp);
+            showToast("Price logged");
           }
         }}
       />

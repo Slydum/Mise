@@ -75,6 +75,65 @@ To reproduce the Pages build locally:
 STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/Mise npm run build   # outputs ./out
 ```
 
+## Grocery pricing (SM Markets)
+
+The Grocery screen shows package sizes and quantities for every ingredient,
+but **there is no live SM Markets Online pricing in this app.** This is a
+deliberate, honest state, not a missing feature waiting on API keys:
+
+- SM Markets Online (`shop.smmarkets.ph`) publishes no public product/price
+  API or developer program.
+- This deployment is a static export on GitHub Pages, which has no server
+  runtime — even a real data source couldn't be fetched per-request from
+  here (see "Moving to a live server" below).
+- A prior version of this app shipped a hand-curated table of *plausible*
+  SM prices. That table has been removed from production entirely — it was
+  never live data, and presenting it as "the SM total" was misleading. It
+  survives only as fixtures inside test files (`lib/grocery/*.test.ts`),
+  which is where estimated numbers belong.
+
+What the app does instead:
+
+- **Every `GroceryItem.livePriceStatus` is always `"unavailable"`.** Nothing
+  in production ever fabricates a peso amount or shows ₱0 for a missing
+  price. `lib/sm/adapter.ts` is the seam a real integration would plug into
+  — every function in it returns `integration-unavailable` today.
+- **Package math still works.** `lib/grocery/sm-packages.ts` keeps package
+  *shapes* (e.g. "eggs are sold by the tray of 30") — that's a fact about
+  retail packaging, not a price — so the app can still tell you "buy 1
+  tray," it just can't tell you what that tray costs.
+- **Purchase history, not price.** You can log what you actually paid after
+  a shopping trip (`lib/grocery/purchase-history.ts`); it's shown as "Last
+  paid ₱X on [date]," scoped to your selected store, and is never summed
+  into a "current" basket total.
+- **An exact store is required.** "SM Markets" alone isn't a price
+  location — Profile → Shopping requires a specific branch (name + city,
+  typed in — there's no live SM store directory to pick from either)
+  before any pricing UI activates.
+
+### What a real integration would need
+
+1. **A server runtime.** Route Handlers under `app/api/` need a Node
+   environment to run per-request — GitHub Pages' static export can't host
+   them. Moving to Vercel (or any Node host) removes the `output: "export"`
+   constraint in `next.config.ts` (see `STATIC_EXPORT` there) and lets
+   `lib/sm/adapter.ts` actually make server-side requests, keeping any
+   credentials out of the browser bundle.
+2. **A real data source**, one of:
+   - An official SM Markets API or partner/affiliate data feed, or
+   - A manually-verified, rate-limited storefront integration built by
+     directly inspecting `shop.smmarkets.ph` in a real browser — this
+     needs a human to confirm what's actually publicly accessible without
+     defeating login, CAPTCHA, or anti-bot controls, since that can't be
+     done or verified from an automated sandbox. (This session's outbound
+     web access is itself blocked at the environment level, independent of
+     SM's own bot-detection posture — see the agent proxy's `403` policy.)
+3. Wire the result into `lib/sm/adapter.ts` in place of the
+   `integration-unavailable` stubs — `GroceryItem.livePriceStatus`,
+   `liveTotalPricePhp`, `lib/grocery/basket.ts`, and the Grocery UI are
+   already built to consume real freshness/status data the moment it
+   exists; no call site should need to change.
+
 ## Supabase (next step)
 
 1. Copy `.env.example` to `.env.local` and fill in the project URL + anon key.

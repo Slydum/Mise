@@ -33,7 +33,7 @@ export function TodayScreen() {
 
   const recipes = useData(getRecipes);
   const profile = useData(getProfile);
-  const grocery = useGroceryList(dietaryStyle, shoppingSettings.householdSize);
+  const grocery = useGroceryList(dietaryStyle, shoppingSettings.householdSize, shoppingSettings.store?.storeId ?? null);
   const loadUseSoon = useCallback(() => getUseSoonIngredients(), []);
   const useSoon = useData(loadUseSoon);
 

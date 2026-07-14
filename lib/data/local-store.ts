@@ -1,4 +1,4 @@
-import type { PriceOverride } from "@/lib/grocery/price-overrides";
+import type { PurchaseRecord } from "@/lib/grocery/purchase-history";
 import type { DietaryStyle, GroceryItem, LeftoverEntry, MealType, PlannedMeal, Recipe, ShoppingSettings } from "@/lib/types";
 import { DEFAULT_DIETARY_STYLE, DEFAULT_SHOPPING_SETTINGS } from "@/lib/types";
 
@@ -27,8 +27,8 @@ const KEYS = {
   leftovers: "mise.leftovers.v1",
   groceryExtra: "mise.grocery.extra.v1",
   pantryItems: "mise.pantry.v1",
-  priceOverrides: "mise.grocery.priceOverrides.v1",
-  shoppingSettings: "mise.profile.shopping.v1",
+  purchaseHistory: "mise.grocery.purchaseHistory.v1",
+  shoppingSettings: "mise.profile.shopping.v2",
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -334,17 +334,18 @@ export function consumeLeftover(id: string, consumedInto: { date: string; mealTy
   write(KEYS.leftovers, next);
 }
 
-// Manual SM price corrections, keyed by canonical ingredient + package/branch --
-// (see lib/grocery/price-overrides.ts for the matching/fallback-priority logic)
+// Purchase history — what the user says they actually paid, per store -------
+// (see lib/grocery/purchase-history.ts for the matching logic; this is never
+// presented as a live price, only as history)
 
-export function loadPriceOverrides(): PriceOverride[] {
-  return read(KEYS.priceOverrides, []);
+export function loadPurchaseHistory(): PurchaseRecord[] {
+  return read(KEYS.purchaseHistory, []);
 }
 
-/** Upserts by `override.id` (deterministic per match context — see overrideId()), so re-editing the same item replaces its prior correction. */
-export function savePriceOverride(override: PriceOverride): void {
-  const all = read<PriceOverride[]>(KEYS.priceOverrides, []);
-  write(KEYS.priceOverrides, [...all.filter((o) => o.id !== override.id), override]);
+/** Upserts by `record.id` (deterministic per match context — see purchaseRecordId()), so re-logging the same item/package/store replaces the prior record. */
+export function savePurchaseRecord(record: PurchaseRecord): void {
+  const all = read<PurchaseRecord[]>(KEYS.purchaseHistory, []);
+  write(KEYS.purchaseHistory, [...all.filter((r) => r.id !== record.id), record]);
 }
 
 // Shopping settings ------------------------------------------------------------

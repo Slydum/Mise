@@ -38,7 +38,7 @@ export function ProfileScreen() {
     addFavorite,
     removeFavorite,
   } = useFoodPreferences();
-  const { settings: shoppingSettings, updateSettings: updateShoppingSettings } = useShoppingSettings();
+  const { settings: shoppingSettings, updateSettings: updateShoppingSettings, setStore } = useShoppingSettings();
   const savedCount = Object.keys(favorites).length;
   const { message: toastMessage, showToast } = useToast();
 
@@ -192,6 +192,10 @@ export function ProfileScreen() {
                 <ShoppingSettingsCard
                   settings={shoppingSettings}
                   onChange={withToast(updateShoppingSettings)}
+                  onSetStore={(storeName, storeCity, storeAddress) => {
+                    setStore(storeName, storeCity, storeAddress);
+                    showToast("Store saved");
+                  }}
                 />
               </CardContent>
             </Card>

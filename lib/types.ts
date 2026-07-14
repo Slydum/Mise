@@ -181,8 +181,13 @@ export function hasRecipeContent(recipe: Recipe): boolean {
   return recipe.ingredients.length > 0 || recipe.steps.length > 0;
 }
 
-/** Where an estimated SM price came from, in fallback-priority order (see lib/grocery/price-overrides.ts). */
-export type PriceSource = "manual-sm" | "receipt" | "sm-online";
+/**
+ * Freshness of a *live* SM Markets price. Mise has no live SM integration
+ * deployed (see lib/sm/adapter.ts) — every item is "unavailable" today. The
+ * enum exists so a real adapter can report real freshness later without a
+ * GroceryItem shape change.
+ */
+export type LivePriceStatus = "live" | "recently-checked" | "refresh-required" | "unavailable";
 
 export interface GroceryItem {
   id: string;
@@ -198,20 +203,23 @@ export interface GroceryItem {
   /** Raw quantity the planned recipes need, before rounding up to whole packages. */
   usageAmount?: number;
   usageUnit?: string;
-  /** Number of retail packages to buy. */
+  /** Number of retail packages to buy — a real fact about how the item is typically sold, not a price. */
   packageCount?: number;
   packageLabel?: string;
   packageAmount?: number;
   packageUnit?: string;
-  /** Estimated PHP price for one package. */
-  estimatedPackagePricePhp?: number;
-  /** packageCount * estimatedPackagePricePhp — the checkout cost, not just the usage-proportional value. */
-  estimatedTotalPricePhp?: number;
-  priceSource?: PriceSource;
-  /** Preferred SM branch this price was sourced from, when known. */
-  branch?: string;
-  /** ISO date the price was last updated. */
-  priceUpdatedAt?: string;
+  /** Always "unavailable" until a real SM adapter exists — see lib/sm/adapter.ts. Never fabricated. */
+  livePriceStatus: LivePriceStatus;
+  /** Only set when livePriceStatus is "live" or "recently-checked" — packageCount * a real SM effective price. Never populated today. */
+  liveTotalPricePhp?: number;
+  /**
+   * The user's own purchase history for this ingredient at their selected
+   * store — explicitly a *historical* record, never presented as today's
+   * price (see lib/grocery/purchase-history.ts).
+   */
+  lastPaidPricePhp?: number;
+  lastPaidAt?: string;
+  lastPaidStoreId?: string;
 }
 
 /** An ingredient the user already has on hand that's nearing its use-by point. */
@@ -233,10 +241,24 @@ export interface UserProfile {
 
 export type PricingMode = "normal" | "conservative";
 
+/**
+ * The user's exact SM Markets branch — "SM Markets" alone is not a price
+ * location. There's no live SM store directory Mise can query, so the user
+ * types this in themselves; storeId is derived locally from name+city so
+ * purchase history and (eventually) live prices can be scoped to it.
+ */
+export interface SmStore {
+  storeId: string;
+  storeName: string;
+  storeCity: string;
+  storeAddress?: string;
+  selectedAt: string;
+}
+
 /** Shopping preferences, kept local-first like dietary style and food preferences (see lib/data/local-store.ts). */
 export interface ShoppingSettings {
-  preferredSupermarket: string;
-  preferredBranch: string;
+  /** Required before any pricing is requested or shown — see components/profile/shopping-settings-card.tsx. */
+  store: SmStore | null;
   weeklyBudgetPhp: number;
   pricingMode: PricingMode;
   /** People the grocery list should be scaled to feed — drives servingsRatio in lib/data/grocery-generator.ts. */
@@ -244,8 +266,7 @@ export interface ShoppingSettings {
 }
 
 export const DEFAULT_SHOPPING_SETTINGS: ShoppingSettings = {
-  preferredSupermarket: "SM Markets",
-  preferredBranch: "",
+  store: null,
   weeklyBudgetPhp: 3000,
   pricingMode: "normal",
   householdSize: 2,

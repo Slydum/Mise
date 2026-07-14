@@ -1,7 +1,7 @@
 import { aggregateIngredients, filterOutPantryItems, type AggregateEntry } from "@/lib/grocery/aggregate";
 import { buildGroceryItems } from "@/lib/grocery/packages";
 import { resolveDayMeals } from "@/lib/data/plan-overrides";
-import { loadPantryItems, loadPriceOverrides } from "@/lib/data/local-store";
+import { loadPantryItems, loadPurchaseHistory } from "@/lib/data/local-store";
 import { addDays, fromDateKey, toDateKey, todayKey } from "@/lib/dates";
 import type { DietaryStyle, GroceryItem } from "@/lib/types";
 
@@ -19,10 +19,16 @@ const GENERATION_DAYS = 7;
  * ShoppingSettings) scales each recipe's ingredients relative to its own
  * base servings — a recipe written for 4 servings feeding a household of 2
  * scales every ingredient by 2/4, not by 1.
+ *
+ * `storeId` (the user's selected exact SM branch, or null if none is set
+ * yet) scopes which purchase-history records count as "last paid" — see
+ * lib/grocery/purchase-history.ts. No store selected means no pricing at
+ * all, by design (see ShoppingSettings.store in lib/types.ts).
  */
 export async function generateGroceryItems(
   dietaryStyle: DietaryStyle,
   desiredServings: number,
+  storeId: string | null,
 ): Promise<GroceryItem[]> {
   const start = fromDateKey(todayKey());
   const dateKeys = Array.from({ length: GENERATION_DAYS }, (_, i) => toDateKey(addDays(start, i)));
@@ -40,5 +46,5 @@ export async function generateGroceryItems(
 
   const usageLines = aggregateIngredients(entries);
   const remaining = filterOutPantryItems(usageLines, loadPantryItems());
-  return buildGroceryItems(remaining, loadPriceOverrides());
+  return buildGroceryItems(remaining, storeId, loadPurchaseHistory());
 }

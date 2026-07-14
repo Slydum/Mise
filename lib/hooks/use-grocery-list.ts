@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { generateGroceryItems } from "@/lib/data/grocery-generator";
 import { filterOutPantryItems } from "@/lib/grocery/aggregate";
 import { getCanonicalKey } from "@/lib/grocery/ingredient-catalog";
-import { overrideId, type PriceOverride } from "@/lib/grocery/price-overrides";
+import { purchaseRecordId, type PurchaseRecord } from "@/lib/grocery/purchase-history";
 import {
   addGroceryItems,
   addPantryItem,
@@ -14,7 +14,7 @@ import {
   removeExtraGroceryItem,
   removePantryItem,
   saveCheckedItems,
-  savePriceOverride,
+  savePurchaseRecord,
   updateExtraGroceryItem,
 } from "@/lib/data/local-store";
 import type { DietaryStyle, GroceryItem } from "@/lib/types";
@@ -26,24 +26,29 @@ export interface UseGroceryListResult {
   pantryItems: string[];
   toggleChecked: (id: string) => void;
   clearChecked: () => void;
-  addItem: (item: Omit<GroceryItem, "id">) => void;
+  addItem: (item: Omit<GroceryItem, "id" | "livePriceStatus">) => void;
   updateItem: (id: string, patch: Partial<GroceryItem>) => void;
   removeItem: (id: string) => void;
   addToPantry: (name: string) => void;
   removeFromPantry: (name: string) => void;
-  /** Corrects an item's estimated price. Persists by canonical key + package/branch, so it survives the next regeneration even for plan-derived (non-manual) items. */
-  updatePrice: (item: GroceryItem, pricePhp: number) => void;
+  /** Logs what the user actually paid at their selected store — history, never presented as a live price. No-ops without a selected store. */
+  logPurchasePrice: (item: GroceryItem, pricePhp: number) => void;
   refresh: () => void;
 }
 
 /**
  * The grocery list: items generated from the next 7 days' plan (scaled to
- * `desiredServings`, priced against the SM catalog and any manual
- * corrections), plus manually-added/recipe-added extras, minus anything
- * pantry-owned — merged into one flat list for the Grocery screen to group
- * and render.
+ * `desiredServings`, priced only from the user's own purchase history at
+ * `storeId` — there is no live SM Markets integration, see
+ * lib/sm/adapter.ts), plus manually-added/recipe-added extras, minus
+ * anything pantry-owned — merged into one flat list for the Grocery screen
+ * to group and render.
  */
-export function useGroceryList(dietaryStyle: DietaryStyle, desiredServings: number): UseGroceryListResult {
+export function useGroceryList(
+  dietaryStyle: DietaryStyle,
+  desiredServings: number,
+  storeId: string | null,
+): UseGroceryListResult {
   const [generated, setGenerated] = useState<GroceryItem[]>([]);
   const [extra, setExtra] = useState<GroceryItem[]>([]);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
@@ -56,7 +61,7 @@ export function useGroceryList(dietaryStyle: DietaryStyle, desiredServings: numb
   useEffect(() => {
     let active = true;
     setLoading(true);
-    generateGroceryItems(dietaryStyle, desiredServings).then((result) => {
+    generateGroceryItems(dietaryStyle, desiredServings, storeId).then((result) => {
       if (active) {
         setGenerated(result);
         setLoading(false);
@@ -68,7 +73,7 @@ export function useGroceryList(dietaryStyle: DietaryStyle, desiredServings: numb
     return () => {
       active = false;
     };
-  }, [dietaryStyle, desiredServings, reloadToken]);
+  }, [dietaryStyle, desiredServings, storeId, reloadToken]);
 
   const items = useMemo(() => {
     const merged = [...generated, ...extra].map((item) => ({
@@ -92,9 +97,11 @@ export function useGroceryList(dietaryStyle: DietaryStyle, desiredServings: numb
   }, []);
 
   const addItem = useCallback(
-    (item: Omit<GroceryItem, "id">) => {
+    (item: Omit<GroceryItem, "id" | "livePriceStatus">) => {
       const canonicalKey = item.canonicalKey ?? getCanonicalKey(item.name);
-      addGroceryItems([{ ...item, canonicalKey, id: `extra-manual-${Date.now()}` }]);
+      addGroceryItems([
+        { ...item, canonicalKey, livePriceStatus: "unavailable", id: `extra-manual-${Date.now()}` },
+      ]);
       refresh();
     },
     [refresh],
@@ -132,25 +139,25 @@ export function useGroceryList(dietaryStyle: DietaryStyle, desiredServings: numb
     [refresh],
   );
 
-  const updatePrice = useCallback(
+  const logPurchasePrice = useCallback(
     (item: GroceryItem, pricePhp: number) => {
+      if (!storeId) return;
       const canonicalKey = item.canonicalKey ?? getCanonicalKey(item.name);
-      const context = { packageAmount: item.packageAmount, packageUnit: item.packageUnit, branch: item.branch };
-      const override: PriceOverride = {
-        id: overrideId(canonicalKey, context),
+      const context = { packageAmount: item.packageAmount, packageUnit: item.packageUnit };
+      const record: PurchaseRecord = {
+        id: purchaseRecordId(canonicalKey, storeId, context),
         canonicalKey,
+        storeId,
         pricePhp,
-        priceSource: "manual-sm",
         packageAmount: item.packageAmount,
         packageUnit: item.packageUnit,
-        productName: item.packageLabel,
-        branch: item.branch,
-        updatedAt: new Date().toISOString(),
+        productLabel: item.packageLabel,
+        purchasedAt: new Date().toISOString(),
       };
-      savePriceOverride(override);
+      savePurchaseRecord(record);
       refresh();
     },
-    [refresh],
+    [refresh, storeId],
   );
 
   return {
@@ -165,7 +172,7 @@ export function useGroceryList(dietaryStyle: DietaryStyle, desiredServings: numb
     removeItem,
     addToPantry,
     removeFromPantry,
-    updatePrice,
+    logPurchasePrice,
     refresh,
   };
 }

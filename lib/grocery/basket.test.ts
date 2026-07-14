@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isPricingFresh, summarizeBasket } from "@/lib/grocery/basket";
-import type { GroceryItem } from "@/lib/types";
+import { deriveBasketStatus, summarizeBasket } from "@/lib/grocery/basket";
+import type { GroceryItem, LivePriceStatus } from "@/lib/types";
 
 function item(overrides: Partial<GroceryItem>): GroceryItem {
   return {
@@ -9,71 +9,100 @@ function item(overrides: Partial<GroceryItem>): GroceryItem {
     amount: 1,
     unit: "piece",
     category: "produce",
+    livePriceStatus: "unavailable",
     ...overrides,
   };
 }
 
 describe("summarizeBasket", () => {
-  it("sums estimated line totals across priced items, checked and unchecked alike", () => {
+  it("sums live totals across live-priced items, checked and unchecked alike", () => {
     const items = [
-      item({ id: "a", estimatedTotalPricePhp: 1200 }),
-      item({ id: "b", estimatedTotalPricePhp: 800 }),
+      item({ id: "a", livePriceStatus: "live", liveTotalPricePhp: 1200 }),
+      item({ id: "b", livePriceStatus: "live", liveTotalPricePhp: 800 }),
     ];
-    expect(summarizeBasket(items, 3000).totalPhp).toBe(2000);
+    expect(summarizeBasket(items, 3000).liveTotalPhp).toBe(2000);
   });
 
-  it("excludes items with no resolved price from the total instead of treating them as ₱0", () => {
-    const items = [item({ id: "a", estimatedTotalPricePhp: 500 }), item({ id: "b" })];
+  it("excludes unavailable items from the total instead of treating them as ₱0", () => {
+    const items = [item({ id: "a", livePriceStatus: "live", liveTotalPricePhp: 500 }), item({ id: "b" })];
     const summary = summarizeBasket(items, 3000);
-    expect(summary.totalPhp).toBe(500);
-    expect(summary.pricedCount).toBe(1);
-    expect(summary.unpricedCount).toBe(1);
-    expect(summary.isComplete).toBe(false);
+    expect(summary.liveTotalPhp).toBe(500);
+    expect(summary.livePricedCount).toBe(1);
+    expect(summary.unavailableCount).toBe(1);
+    expect(summary.isLiveComplete).toBe(false);
+  });
+
+  it("never sums a user's lastPaid (historical) price into the live total", () => {
+    const items = [item({ id: "a", lastPaidPricePhp: 500, lastPaidAt: "2026-06-01" })];
+    const summary = summarizeBasket(items, 3000);
+    expect(summary.liveTotalPhp).toBe(0);
+    expect(summary.livePricedCount).toBe(0);
+    expect(summary.unavailableCount).toBe(1);
   });
 
   it("a manually-added item without a price doesn't affect the total", () => {
-    const items = [item({ id: "extra-manual-1", name: "Napkins", estimatedTotalPricePhp: undefined })];
-    expect(summarizeBasket(items, 3000).totalPhp).toBe(0);
+    const items = [item({ id: "extra-manual-1", name: "Napkins" })];
+    expect(summarizeBasket(items, 3000).liveTotalPhp).toBe(0);
   });
 
-  it("reports under budget when the total is below the weekly budget", () => {
-    const items = [item({ estimatedTotalPricePhp: 2485 })];
+  it("has no budget delta at all when nothing is live-priced yet — never compares a fabricated total to the budget", () => {
+    const items = [item({ id: "a" })];
+    expect(summarizeBasket(items, 3000).budgetDeltaPhp).toBeNull();
+  });
+
+  it("reports under budget when the live total is below the weekly budget", () => {
+    const items = [item({ livePriceStatus: "live", liveTotalPricePhp: 2485 })];
     const summary = summarizeBasket(items, 3000);
     expect(summary.budgetDeltaPhp).toBe(515);
   });
 
-  it("reports over budget when the total exceeds the weekly budget", () => {
-    const items = [item({ estimatedTotalPricePhp: 3600 })];
+  it("reports over budget when the live total exceeds the weekly budget", () => {
+    const items = [item({ livePriceStatus: "live", liveTotalPricePhp: 3600 })];
     const summary = summarizeBasket(items, 3000);
     expect(summary.budgetDeltaPhp).toBe(-600);
   });
 
-  it("is complete when every item has a price", () => {
-    const items = [item({ id: "a", estimatedTotalPricePhp: 100 }), item({ id: "b", estimatedTotalPricePhp: 200 })];
-    expect(summarizeBasket(items, 3000).isComplete).toBe(true);
+  it("is live-complete only when every item has a live price", () => {
+    const items = [
+      item({ id: "a", livePriceStatus: "live", liveTotalPricePhp: 100 }),
+      item({ id: "b", livePriceStatus: "live", liveTotalPricePhp: 200 }),
+    ];
+    expect(summarizeBasket(items, 3000).isLiveComplete).toBe(true);
   });
 
-  it("tracks the most recently updated price across the basket", () => {
-    const items = [
-      item({ id: "a", estimatedTotalPricePhp: 100, priceUpdatedAt: "2026-06-01" }),
-      item({ id: "b", estimatedTotalPricePhp: 200, priceUpdatedAt: "2026-07-10" }),
-    ];
-    expect(summarizeBasket(items, 3000).mostRecentPriceUpdatedAt).toBe("2026-07-10");
+  it("today, with no SM adapter connected, is never live-complete for a non-empty basket", () => {
+    const items = [item({ id: "a" }), item({ id: "b" })];
+    expect(summarizeBasket(items, 3000).isLiveComplete).toBe(false);
+    expect(summarizeBasket(items, 3000).liveTotalPhp).toBe(0);
   });
 });
 
-describe("isPricingFresh", () => {
-  const now = new Date("2026-07-14T00:00:00Z");
+describe("deriveBasketStatus", () => {
+  function withStatuses(...statuses: LivePriceStatus[]): GroceryItem[] {
+    return statuses.map((livePriceStatus, i) => item({ id: `item-${i}`, livePriceStatus }));
+  }
 
-  it("is fresh within the freshness window", () => {
-    expect(isPricingFresh("2026-06-20", now)).toBe(true);
+  it("is unavailable for an empty basket", () => {
+    expect(deriveBasketStatus([])).toBe("unavailable");
   });
 
-  it("is stale outside the freshness window", () => {
-    expect(isPricingFresh("2026-01-01", now)).toBe(false);
+  it("is unavailable when every item is unavailable — the honest default with no SM adapter", () => {
+    expect(deriveBasketStatus(withStatuses("unavailable", "unavailable"))).toBe("unavailable");
   });
 
-  it("is not fresh when there's no price at all", () => {
-    expect(isPricingFresh(undefined, now)).toBe(false);
+  it("is live when every item is live", () => {
+    expect(deriveBasketStatus(withStatuses("live", "live"))).toBe("live");
+  });
+
+  it("is recently-checked when items are a live/recently-checked mix with no stale items", () => {
+    expect(deriveBasketStatus(withStatuses("live", "recently-checked"))).toBe("recently-checked");
+  });
+
+  it("is partially-available when some items are live-ish and some are not", () => {
+    expect(deriveBasketStatus(withStatuses("live", "unavailable"))).toBe("partially-available");
+  });
+
+  it("is refresh-required when stale items exist but none are live-ish", () => {
+    expect(deriveBasketStatus(withStatuses("refresh-required", "unavailable"))).toBe("refresh-required");
   });
 });

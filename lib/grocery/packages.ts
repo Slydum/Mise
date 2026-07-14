@@ -1,9 +1,9 @@
 import { getCatalogEntry } from "@/lib/grocery/ingredient-catalog";
-import { resolvePrice, type PriceOverride, type SeededPrice } from "@/lib/grocery/price-overrides";
+import { resolveLastPaid, type PurchaseRecord } from "@/lib/grocery/purchase-history";
 import type { PackageForm, RetailPackage } from "@/lib/grocery/sm-packages";
 import { toBaseAmount, unitKindOf } from "@/lib/grocery/units";
 import type { UsageLine } from "@/lib/grocery/aggregate";
-import type { GroceryItem, PriceSource } from "@/lib/types";
+import type { GroceryItem } from "@/lib/types";
 
 /** Rounds a usage amount up to a practical shopping increment — fine-grained for small amounts, coarser for large ones. */
 export function roundToPracticalAmount(amount: number, baseUnit: string): number {
@@ -22,19 +22,15 @@ export interface PurchaseSelection {
   packageLabel?: string;
   packageAmount?: number;
   packageUnit?: string;
-  pricePhp?: number;
-  priceSource?: PriceSource;
-  branch?: string;
-  lastUpdatedAt?: string;
 }
 
 /**
- * A package can only price/size an ingredient's usage when their units are
+ * A package can only size an ingredient's usage when their units are
  * compatible: same metric family (mass-mass, volume-volume — converted via
  * toBaseAmount before comparing) or an exact discrete-unit match ("piece" to
  * "piece", "clove" to "clove"). Pieces never compare against grams. When no
  * curated package is unit-compatible, the ingredient falls back to loose
- * practical rounding with no price attached — a price "needing confirmation."
+ * practical rounding.
  */
 function isUnitCompatible(baseUnit: string, packageUnit: string): boolean {
   const baseKind = unitKindOf(baseUnit);
@@ -52,9 +48,9 @@ function findCompatiblePackage(packages: RetailPackage[], baseUnit: string): Ret
 /**
  * The usage-vs-purchase split: how much a recipe needs vs. what you'd
  * actually have to buy. Curated, unit-compatible ingredients round up to
- * whole retail packages (ceiling division) and carry the package's seeded
- * price; everything else falls back to a practical loose-amount rounding
- * with no price.
+ * whole retail packages (ceiling division); everything else falls back to a
+ * practical loose-amount rounding. Package *shapes* only — no pricing lives
+ * here (see lib/grocery/sm-packages.ts).
  */
 export function selectPurchase(canonicalKey: string, neededAmount: number, baseUnit: string): PurchaseSelection {
   const entry = getCatalogEntry(canonicalKey);
@@ -74,10 +70,6 @@ export function selectPurchase(canonicalKey: string, neededAmount: number, baseU
     packageLabel: pkg.label,
     packageAmount: pkg.amount,
     packageUnit: pkg.unit,
-    pricePhp: pkg.pricePhp,
-    priceSource: pkg.priceSource,
-    branch: pkg.branch,
-    lastUpdatedAt: pkg.lastUpdatedAt,
   };
 }
 
@@ -91,42 +83,31 @@ function toDisplayUnit(amount: number, baseUnit: string): { amount: number; unit
 /**
  * Turns aggregated usage lines into final purchasable grocery items — ids
  * stay deterministic across regenerations so check-off state persists.
- * `overrides` (optional — pure/testable, no localStorage access here) layers
- * user price corrections over the seeded SM catalog per the fallback
- * priority in lib/grocery/price-overrides.ts.
+ *
+ * There is no live SM Markets integration (see lib/sm/adapter.ts), so every
+ * item's `livePriceStatus` is always "unavailable" — this function never
+ * fabricates a price. The only price data available is the user's own
+ * purchase history at their selected store (`storeId`/`purchaseRecords`),
+ * surfaced separately as `lastPaidPricePhp` — explicitly historical, never
+ * summed into a "current" total (see lib/grocery/basket.ts).
  */
-export function buildGroceryItems(usageLines: UsageLine[], overrides: PriceOverride[] = []): GroceryItem[] {
+export function buildGroceryItems(
+  usageLines: UsageLine[],
+  storeId: string | null = null,
+  purchaseRecords: PurchaseRecord[] = [],
+): GroceryItem[] {
   return usageLines.map((line) => {
     const purchase = selectPurchase(line.canonicalKey, line.amount, line.baseUnit);
     const id = `gen-${line.canonicalKey}-${line.baseUnit}`.replace(/\s+/g, "-");
 
-    const seeded: SeededPrice | undefined =
-      purchase.pricePhp !== undefined
-        ? {
-            pricePhp: purchase.pricePhp,
-            priceSource: purchase.priceSource!,
-            branch: purchase.branch,
-            lastUpdatedAt: purchase.lastUpdatedAt!,
-          }
-        : undefined;
-
-    const resolved = resolvePrice(
-      line.canonicalKey,
-      { packageAmount: purchase.packageAmount, packageUnit: purchase.packageUnit, branch: purchase.branch },
-      overrides,
-      seeded,
-    );
-
-    const priceFields = resolved
-      ? {
-          estimatedPackagePricePhp: resolved.pricePhp,
-          // The checkout cost is the whole package(s) bought, not the proportional value of what's used.
-          estimatedTotalPricePhp: resolved.pricePhp * (purchase.packageCount ?? 1),
-          priceSource: resolved.priceSource,
-          priceUpdatedAt: resolved.priceUpdatedAt,
-          ...(resolved.branch ? { branch: resolved.branch } : {}),
-        }
-      : {};
+    const lastPaid = storeId
+      ? resolveLastPaid(
+          line.canonicalKey,
+          storeId,
+          { packageAmount: purchase.packageAmount, packageUnit: purchase.packageUnit },
+          purchaseRecords,
+        )
+      : undefined;
 
     const shared = {
       id,
@@ -135,7 +116,14 @@ export function buildGroceryItems(usageLines: UsageLine[], overrides: PriceOverr
       canonicalKey: line.canonicalKey,
       usageAmount: line.amount,
       usageUnit: line.baseUnit,
-      ...priceFields,
+      livePriceStatus: "unavailable" as const,
+      ...(lastPaid
+        ? {
+            lastPaidPricePhp: lastPaid.pricePhp,
+            lastPaidAt: lastPaid.purchasedAt,
+            lastPaidStoreId: lastPaid.storeId,
+          }
+        : {}),
     };
 
     if (purchase.packageForm && purchase.packageCount) {

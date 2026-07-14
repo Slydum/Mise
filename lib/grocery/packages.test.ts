@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { aggregateIngredients } from "@/lib/grocery/aggregate";
 import { buildGroceryItems, roundToPracticalAmount, selectPurchase } from "@/lib/grocery/packages";
 import type { UsageLine } from "@/lib/grocery/aggregate";
-import type { PriceOverride } from "@/lib/grocery/price-overrides";
+import type { PurchaseRecord } from "@/lib/grocery/purchase-history";
 import type { Ingredient } from "@/lib/types";
 
 describe("roundToPracticalAmount", () => {
@@ -56,7 +56,6 @@ describe("selectPurchase", () => {
     // Onion is curated per-piece; asking for it in grams shouldn't match that package.
     const result = selectPurchase("onion", 500, "g");
     expect(result.packageForm).toBeUndefined();
-    expect(result.pricePhp).toBeUndefined();
     expect(result.purchaseAmount).toBe(500);
   });
 
@@ -64,7 +63,6 @@ describe("selectPurchase", () => {
     const result = selectPurchase("soy sauce", 5, "tbsp");
     expect(result.packageForm).toBe("bottle");
     expect(result.packageCount).toBe(1); // 5 tbsp needed, one ~13-tbsp bottle covers it
-    expect(result.pricePhp).toBe(18);
   });
 });
 
@@ -122,74 +120,51 @@ describe("buildGroceryItems", () => {
     expect(item.unit).toBe("kilogram");
   });
 
-  it("prices a single-package purchase", () => {
-    const [item] = buildGroceryItems([
-      usageLine({ canonicalKey: "canned tuna", displayName: "Canned tuna", amount: 1, baseUnit: "can" }),
-    ]);
-    expect(item.packageCount).toBe(1);
-    expect(item.estimatedPackagePricePhp).toBe(35);
-    expect(item.estimatedTotalPricePhp).toBe(35);
-  });
-
-  it("prices a multiple-package purchase as packageCount * price-per-package", () => {
+  it("never fabricates a live price — every item is unavailable without a real SM adapter", () => {
     const [item] = buildGroceryItems([
       usageLine({ canonicalKey: "canned tuna", displayName: "Canned tuna", amount: 3, baseUnit: "can" }),
     ]);
-    expect(item.packageCount).toBe(3);
-    expect(item.estimatedPackagePricePhp).toBe(35);
-    expect(item.estimatedTotalPricePhp).toBe(105);
+    expect(item.livePriceStatus).toBe("unavailable");
+    expect(item.liveTotalPricePhp).toBeUndefined();
   });
 
-  it("rounds the package count up rather than charging for a fractional package", () => {
-    const [item] = buildGroceryItems([
-      usageLine({ canonicalKey: "chicken thigh", displayName: "Chicken thighs", amount: 2500, baseUnit: "g" }),
-    ]);
-    expect(item.packageCount).toBe(3); // ceil(2500/1000)
-    expect(item.estimatedTotalPricePhp).toBe(630); // 3 * 210
-  });
-
-  it("charges for the whole package bought, not the proportional value of what's used (usage vs. checkout cost)", () => {
-    // Recipe needs 400 g of chicken thighs; SM sells a 1 kg pack at ₱210.
-    // Usage-proportional cost would be ₱84 — checkout cost is the full ₱210.
-    const [item] = buildGroceryItems([
-      usageLine({ canonicalKey: "chicken thigh", displayName: "Chicken thighs", amount: 400, baseUnit: "g" }),
-    ]);
-    expect(item.usageAmount).toBe(400);
-    expect(item.estimatedTotalPricePhp).toBe(210);
-    expect(item.estimatedTotalPricePhp).not.toBe(84);
-  });
-
-  it("shows no price for an ingredient with no unit-compatible package — needs confirmation, not ₱0", () => {
-    const [item] = buildGroceryItems([
-      usageLine({ canonicalKey: "onion", displayName: "Onion", amount: 500, baseUnit: "g" }),
-    ]);
-    expect(item.estimatedPackagePricePhp).toBeUndefined();
-    expect(item.estimatedTotalPricePhp).toBeUndefined();
-  });
-
-  it("applies a manual price override over the seeded catalog price", () => {
-    const overrides: PriceOverride[] = [
-      {
-        id: "override-1",
-        canonicalKey: "canned tuna",
-        pricePhp: 42,
-        priceSource: "manual-sm",
-        packageAmount: 1,
-        packageUnit: "can",
-        updatedAt: "2026-07-10",
-      },
+  it("has no price at all without a selected store, even with purchase history for the ingredient elsewhere", () => {
+    const records: PurchaseRecord[] = [
+      { id: "r1", canonicalKey: "canned tuna", storeId: "sm-fairview", pricePhp: 35, purchasedAt: "2026-07-01" },
     ];
     const [item] = buildGroceryItems(
-      [usageLine({ canonicalKey: "canned tuna", displayName: "Canned tuna", amount: 2, baseUnit: "can" })],
-      overrides,
+      [usageLine({ canonicalKey: "canned tuna", displayName: "Canned tuna", amount: 1, baseUnit: "can" })],
+      null,
+      records,
     );
-    expect(item.estimatedPackagePricePhp).toBe(42);
-    expect(item.estimatedTotalPricePhp).toBe(84); // 2 packages * the corrected price
-    expect(item.priceSource).toBe("manual-sm");
-    expect(item.priceUpdatedAt).toBe("2026-07-10");
+    expect(item.lastPaidPricePhp).toBeUndefined();
   });
 
-  it("scales priced quantities by the servings ratio before purchase/price selection", () => {
+  it("surfaces the most recent matching purchase-history record as lastPaid, scoped to the given store", () => {
+    const records: PurchaseRecord[] = [
+      { id: "r1", canonicalKey: "canned tuna", storeId: "sm-fairview", pricePhp: 35, purchasedAt: "2026-06-01" },
+      { id: "r2", canonicalKey: "canned tuna", storeId: "sm-fairview", pricePhp: 38, purchasedAt: "2026-07-10" },
+      { id: "r3", canonicalKey: "canned tuna", storeId: "sm-north-edsa", pricePhp: 99, purchasedAt: "2026-07-12" },
+    ];
+    const [item] = buildGroceryItems(
+      [usageLine({ canonicalKey: "canned tuna", displayName: "Canned tuna", amount: 1, baseUnit: "can" })],
+      "sm-fairview",
+      records,
+    );
+    expect(item.lastPaidPricePhp).toBe(38);
+    expect(item.lastPaidStoreId).toBe("sm-fairview");
+  });
+
+  it("never shows a lastPaid price for an ingredient with no matching purchase history — not ₱0", () => {
+    const [item] = buildGroceryItems(
+      [usageLine({ canonicalKey: "onion", displayName: "Onion", amount: 500, baseUnit: "g" })],
+      "sm-fairview",
+      [],
+    );
+    expect(item.lastPaidPricePhp).toBeUndefined();
+  });
+
+  it("scales quantities by the servings ratio before purchase selection", () => {
     const chickenThighs: Ingredient = {
       id: "ct",
       name: "Chicken thighs",
@@ -202,6 +177,5 @@ describe("buildGroceryItems", () => {
     const [item] = buildGroceryItems(lines);
     expect(item.usageAmount).toBe(600);
     expect(item.packageCount).toBe(1); // still fits in one 1 kg pack
-    expect(item.estimatedTotalPricePhp).toBe(210);
   });
 });
