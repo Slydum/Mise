@@ -42,12 +42,15 @@ export function TodayScreen() {
   // shows a stale day.
   const [dateKey] = useState(todayKey);
   const { dietaryStyle } = useDietaryStyle();
-  const { allergies, excludedIngredients, favoriteIngredients } = useFoodPreferences();
+  const { avoidTerms, ranking, calorieGoal, proteinGoal } = useFoodPreferences();
 
   const recipes = useData(getRecipes);
   const profile = useData(getProfile);
   const groceryList = useData(getGroceryList);
-  const loadPlan = useCallback(() => getDayPlan(dateKey, dietaryStyle), [dateKey, dietaryStyle]);
+  const loadPlan = useCallback(
+    () => getDayPlan(dateKey, dietaryStyle, { avoidTerms, ranking }),
+    [dateKey, dietaryStyle, avoidTerms, ranking],
+  );
   const plan = useData(loadPlan);
   const loadUseSoon = useCallback(() => getUseSoonIngredients(), []);
   const useSoon = useData(loadUseSoon);
@@ -92,10 +95,6 @@ export function TodayScreen() {
     () => Array.from(new Set(allMeals.map((m) => m.recipeId))),
     [allMeals],
   );
-  const avoidTerms = useMemo(
-    () => [...allergies, ...excludedIngredients],
-    [allergies, excludedIngredients],
-  );
   const loadSuggested = useCallback(
     () =>
       getSuggestedRecipes(
@@ -104,9 +103,9 @@ export function TodayScreen() {
         6,
         dietaryStyle,
         avoidTerms,
-        favoriteIngredients,
+        ranking,
       ),
-    [plannedRecipeIds, dateKey, dietaryStyle, avoidTerms, favoriteIngredients],
+    [plannedRecipeIds, dateKey, dietaryStyle, avoidTerms, ranking],
   );
   const suggested = useData(loadSuggested);
 
@@ -173,9 +172,9 @@ export function TodayScreen() {
 
           <ProgressRings
             calories={consumed.calories}
-            caloriesGoal={profile.goals.calories}
+            caloriesGoal={calorieGoal ?? profile.goals.calories}
             protein={consumed.protein}
-            proteinGoal={profile.goals.protein}
+            proteinGoal={proteinGoal ?? profile.goals.protein}
             waterMl={waterMl}
             waterGoalMl={profile.waterGoalMl}
             onAddWater={handleAddWater}

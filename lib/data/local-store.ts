@@ -1,4 +1,4 @@
-import type { DietaryStyle, MealType, PlannedMeal } from "@/lib/types";
+import type { BudgetLevel, DietaryStyle, MealType, PlannedMeal } from "@/lib/types";
 import { DEFAULT_DIETARY_STYLE } from "@/lib/types";
 
 /**
@@ -20,6 +20,12 @@ const KEYS = {
   allergies: "mise.profile.allergies.v1",
   excludedIngredients: "mise.profile.excludedIngredients.v1",
   favoriteIngredients: "mise.profile.favoriteIngredients.v1",
+  preferredCuisines: "mise.profile.preferredCuisines.v1",
+  maxCookMinutes: "mise.profile.maxCookMinutes.v1",
+  budgetPreference: "mise.profile.budgetPreference.v1",
+  servings: "mise.profile.servings.v1",
+  calorieGoal: "mise.profile.calorieGoal.v1",
+  proteinGoal: "mise.profile.proteinGoal.v1",
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -178,4 +184,62 @@ export function loadFavoriteIngredients(): string[] {
 
 export function saveFavoriteIngredients(values: string[]): void {
   write(KEYS.favoriteIngredients, values);
+}
+
+export function loadPreferredCuisines(): string[] {
+  return read(KEYS.preferredCuisines, []);
+}
+
+export function savePreferredCuisines(values: string[]): void {
+  write(KEYS.preferredCuisines, values);
+}
+
+/** `null` means no cap. */
+export function loadMaxCookMinutes(): number | null {
+  return read<number | null>(KEYS.maxCookMinutes, null);
+}
+
+export function saveMaxCookMinutes(value: number | null): void {
+  write(KEYS.maxCookMinutes, value);
+}
+
+/** `null` means no preference. */
+export function loadBudgetPreference(): BudgetLevel | null {
+  return read<BudgetLevel | null>(KEYS.budgetPreference, null);
+}
+
+export function saveBudgetPreference(value: BudgetLevel | null): void {
+  write(KEYS.budgetPreference, value);
+}
+
+/**
+ * Number of people the plan should serve. Stored and editable in Profile;
+ * intentionally not yet wired into recipe scaling, grocery quantities, or
+ * ranking — household-aware planning is out of scope for now (see
+ * PlanPreferences/RankingPreferences, which don't take a servings field).
+ */
+export function loadServings(): number {
+  return read(KEYS.servings, 2);
+}
+
+export function saveServings(value: number): void {
+  write(KEYS.servings, value);
+}
+
+/** `null` means use the profile default. */
+export function loadCalorieGoal(): number | null {
+  return read<number | null>(KEYS.calorieGoal, null);
+}
+
+export function saveCalorieGoal(value: number | null): void {
+  write(KEYS.calorieGoal, value);
+}
+
+/** `null` means use the profile default. */
+export function loadProteinGoal(): number | null {
+  return read<number | null>(KEYS.proteinGoal, null);
+}
+
+export function saveProteinGoal(value: number | null): void {
+  write(KEYS.proteinGoal, value);
 }

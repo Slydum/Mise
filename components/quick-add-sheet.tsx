@@ -9,7 +9,7 @@ import {
   SheetDescription,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { filterRecipesByDiet, recipeContainsAnyIngredient } from "@/lib/diet";
+import { filterRecipesByDiet, recipeContainsAnyIngredient, scoreRecipe } from "@/lib/diet";
 import { getRecipes } from "@/lib/data";
 import { useData } from "@/lib/hooks/use-data";
 import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
@@ -30,7 +30,7 @@ interface QuickAddSheetProps {
 export function QuickAddSheet({ open, onOpenChange, initialMealType, onAdd }: QuickAddSheetProps) {
   const recipes = useData(getRecipes);
   const { dietaryStyle } = useDietaryStyle();
-  const { allergies, excludedIngredients } = useFoodPreferences();
+  const { avoidTerms, ranking } = useFoodPreferences();
   const [mealType, setMealType] = useState<MealType>(initialMealType ?? "snack");
 
   // Re-sync the preselected slot each time the sheet opens.
@@ -40,20 +40,17 @@ export function QuickAddSheet({ open, onOpenChange, initialMealType, onAdd }: Qu
     if (open && initialMealType) setMealType(initialMealType);
   }
 
-  const avoidTerms = useMemo(
-    () => [...allergies, ...excludedIngredients],
-    [allergies, excludedIngredients],
-  );
-
   const suggestions = useMemo(() => {
     if (!recipes) return [];
     const compatible = filterRecipesByDiet(recipes, dietaryStyle).filter(
       (r) => !recipeContainsAnyIngredient(r, avoidTerms),
     );
-    return [...compatible].sort(
-      (a, b) => Number(b.mealTypes.includes(mealType)) - Number(a.mealTypes.includes(mealType)),
-    );
-  }, [recipes, dietaryStyle, avoidTerms, mealType]);
+    return [...compatible].sort((a, b) => {
+      // Requested meal slot first, then soft preference (cuisine, cook time, budget, favorites).
+      const slotDiff = Number(b.mealTypes.includes(mealType)) - Number(a.mealTypes.includes(mealType));
+      return slotDiff !== 0 ? slotDiff : scoreRecipe(b, ranking) - scoreRecipe(a, ranking);
+    });
+  }, [recipes, dietaryStyle, avoidTerms, ranking, mealType]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

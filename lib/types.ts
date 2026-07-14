@@ -111,6 +111,17 @@ export const DIETARY_STYLE_DESCRIPTIONS: Record<DietaryStyle, string> = {
 
 export const DEFAULT_DIETARY_STYLE: DietaryStyle = "pescatarian";
 
+/** Relative cost of a recipe's ingredients, for budget-conscious ranking. */
+export type BudgetLevel = "budget" | "moderate" | "splurge";
+
+export const BUDGET_LEVELS: BudgetLevel[] = ["budget", "moderate", "splurge"];
+
+export const BUDGET_LEVEL_LABELS: Record<BudgetLevel, string> = {
+  budget: "Budget",
+  moderate: "Moderate",
+  splurge: "Splurge",
+};
+
 export interface Recipe {
   id: string;
   title: string;
@@ -123,6 +134,10 @@ export interface Recipe {
   tags: RecipeTag[];
   /** Eating styles this recipe satisfies (see DietaryStyle). */
   dietaryStyles: DietaryStyle[];
+  /** Freeform cuisine label (e.g. "Japanese", "Mediterranean"), matched case-insensitively against preferred cuisines. */
+  cuisine: string;
+  /** Relative cost of the recipe's ingredients. */
+  costLevel: BudgetLevel;
   prepMinutes: number;
   cookMinutes: number;
   servings: number;

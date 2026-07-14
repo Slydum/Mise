@@ -10,7 +10,12 @@ import type {
 } from "@/lib/types";
 import { DEFAULT_DIETARY_STYLE, MEAL_TYPES } from "@/lib/types";
 import { addDays, fromDateKey, toDateKey } from "@/lib/dates";
-import { isRecipeDietCompatible, recipeContainsAnyIngredient } from "@/lib/diet";
+import {
+  isRecipeDietCompatible,
+  recipeContainsAnyIngredient,
+  scoreRecipe,
+  type RankingPreferences,
+} from "@/lib/diet";
 import {
   mockGroceryItems,
   mockProfile,
@@ -37,26 +42,75 @@ export async function getRecipe(id: string): Promise<Recipe | null> {
   return mockRecipes.find((r) => r.id === id) ?? null;
 }
 
-/** Deterministic diet-compatible stand-in when the rotation's usual pick doesn't fit. */
-function pickCompatibleFallback(mealType: MealType, style: DietaryStyle, dayOfWeek: number): Recipe {
-  const candidates = mockRecipes.filter(
+/** Allergies and excluded ingredients are hard rules; everything else is a soft ranking boost. */
+export interface PlanPreferences {
+  avoidTerms?: string[];
+  ranking?: RankingPreferences;
+}
+
+/** Ranks candidates by soft preference and picks deterministically by day-of-week. */
+function rankAndPick(candidates: Recipe[], dayOfWeek: number, ranking: RankingPreferences): Recipe {
+  const ranked = [...candidates].sort((a, b) => scoreRecipe(b, ranking) - scoreRecipe(a, ranking));
+  return ranked[dayOfWeek % ranked.length];
+}
+
+/**
+ * Deterministic stand-in for when the rotation's usual pick doesn't fit —
+ * either the eating style or (hard rule) an allergy/excluded ingredient.
+ * Ranks the remaining candidates by soft preference (cuisine, cook time,
+ * budget, favorite ingredients) and picks among them by day-of-week so the
+ * result stays stable across renders.
+ *
+ * If no recipe for this slot satisfies both hard rules at once (shouldn't
+ * happen with the current catalog), allergy/exclusion safety is relaxed last,
+ * after eating style — allergies can cause real harm, eating style can't.
+ */
+function pickCompatibleFallback(
+  mealType: MealType,
+  style: DietaryStyle,
+  dayOfWeek: number,
+  avoidTerms: string[],
+  ranking: RankingPreferences,
+): Recipe {
+  const bothRules = mockRecipes.filter(
+    (r) =>
+      r.mealTypes.includes(mealType) &&
+      isRecipeDietCompatible(r, style) &&
+      !recipeContainsAnyIngredient(r, avoidTerms),
+  );
+  if (bothRules.length > 0) return rankAndPick(bothRules, dayOfWeek, ranking);
+
+  const avoidOnly = mockRecipes.filter(
+    (r) => r.mealTypes.includes(mealType) && !recipeContainsAnyIngredient(r, avoidTerms),
+  );
+  if (avoidOnly.length > 0) return rankAndPick(avoidOnly, dayOfWeek, ranking);
+
+  const dietOnly = mockRecipes.filter(
     (r) => r.mealTypes.includes(mealType) && isRecipeDietCompatible(r, style),
   );
-  if (candidates.length > 0) return candidates[dayOfWeek % candidates.length];
-  // No compatible recipe exists for this slot (shouldn't happen with the current
-  // catalog) — fall back to any recipe for the slot rather than crash.
+  if (dietOnly.length > 0) return rankAndPick(dietOnly, dayOfWeek, ranking);
+
   return mockRecipes.find((r) => r.mealTypes.includes(mealType))!;
 }
 
-function plannedMealsFor(dateKey: string, dietaryStyle: DietaryStyle): PlannedMeal[] {
+function plannedMealsFor(
+  dateKey: string,
+  dietaryStyle: DietaryStyle,
+  prefs: PlanPreferences,
+): PlannedMeal[] {
   const dayOfWeek = fromDateKey(dateKey).getDay();
+  const avoidTerms = prefs.avoidTerms ?? [];
+  const ranking = prefs.ranking ?? {};
   return MEAL_TYPES.map((mealType: MealType) => {
     const rotation = weeklyRotation[mealType];
     const rotationId = rotation[dayOfWeek % rotation.length];
     const rotationPick = mockRecipes.find((r) => r.id === rotationId)!;
-    const recipe = isRecipeDietCompatible(rotationPick, dietaryStyle)
+    const rotationPickAllowed =
+      isRecipeDietCompatible(rotationPick, dietaryStyle) &&
+      !recipeContainsAnyIngredient(rotationPick, avoidTerms);
+    const recipe = rotationPickAllowed
       ? rotationPick
-      : pickCompatibleFallback(mealType, dietaryStyle, dayOfWeek);
+      : pickCompatibleFallback(mealType, dietaryStyle, dayOfWeek, avoidTerms, ranking);
     return {
       id: `${dateKey}-${mealType}`,
       date: dateKey,
@@ -69,8 +123,9 @@ function plannedMealsFor(dateKey: string, dietaryStyle: DietaryStyle): PlannedMe
 export async function getDayPlan(
   dateKey: string,
   dietaryStyle: DietaryStyle = DEFAULT_DIETARY_STYLE,
+  prefs: PlanPreferences = {},
 ): Promise<DayPlan> {
-  return { date: dateKey, meals: plannedMealsFor(dateKey, dietaryStyle) };
+  return { date: dateKey, meals: plannedMealsFor(dateKey, dietaryStyle, prefs) };
 }
 
 /** Returns `count` consecutive day plans starting at `startKey`. */
@@ -78,10 +133,13 @@ export async function getPlanRange(
   startKey: string,
   count: number,
   dietaryStyle: DietaryStyle = DEFAULT_DIETARY_STYLE,
+  prefs: PlanPreferences = {},
 ): Promise<DayPlan[]> {
   const start = fromDateKey(startKey);
   return Promise.all(
-    Array.from({ length: count }, (_, i) => getDayPlan(toDateKey(addDays(start, i)), dietaryStyle)),
+    Array.from({ length: count }, (_, i) =>
+      getDayPlan(toDateKey(addDays(start, i)), dietaryStyle, prefs),
+    ),
   );
 }
 
@@ -111,7 +169,7 @@ export async function getSuggestedRecipes(
   count = 6,
   dietaryStyle: DietaryStyle = DEFAULT_DIETARY_STYLE,
   avoidTerms: string[] = [],
-  boostTerms: string[] = [],
+  ranking: RankingPreferences = {},
 ): Promise<Recipe[]> {
   let pool = mockRecipes.filter(
     (r) => !excludeIds.includes(r.id) && isRecipeDietCompatible(r, dietaryStyle),
@@ -125,14 +183,7 @@ export async function getSuggestedRecipes(
   for (let i = 0; i < seedKey.length; i++) seed = (seed + seedKey.charCodeAt(i)) % pool.length;
   const rotated = [...pool.slice(seed), ...pool.slice(0, seed)];
 
-  const prioritized =
-    boostTerms.length > 0
-      ? [...rotated].sort(
-          (a, b) =>
-            Number(Boolean(recipeContainsAnyIngredient(b, boostTerms))) -
-            Number(Boolean(recipeContainsAnyIngredient(a, boostTerms))),
-        )
-      : rotated;
+  const prioritized = [...rotated].sort((a, b) => scoreRecipe(b, ranking) - scoreRecipe(a, ranking));
 
   return prioritized.slice(0, count);
 }

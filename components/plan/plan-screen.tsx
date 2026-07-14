@@ -13,6 +13,7 @@ import { addExtraMeal, loadExtraMeals } from "@/lib/data/local-store";
 import { addDays, formatShortDate, fromDateKey, isToday, toDateKey, todayKey } from "@/lib/dates";
 import { useData } from "@/lib/hooks/use-data";
 import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
+import { useFoodPreferences } from "@/lib/hooks/use-food-preferences";
 import type { MealType, PlannedMeal, Recipe } from "@/lib/types";
 import { MEAL_TYPES } from "@/lib/types";
 
@@ -43,10 +44,12 @@ export function PlanScreen() {
   });
 
   const { dietaryStyle } = useDietaryStyle();
+  const { avoidTerms, ranking } = useFoodPreferences();
   const recipes = useData(getRecipes);
   const loadPlan = useCallback(
-    () => (selected ? getDayPlan(selected, dietaryStyle) : Promise.resolve(null)),
-    [selected, dietaryStyle],
+    () =>
+      selected ? getDayPlan(selected, dietaryStyle, { avoidTerms, ranking }) : Promise.resolve(null),
+    [selected, dietaryStyle, avoidTerms, ranking],
   );
   const plan = useData(loadPlan);
 
