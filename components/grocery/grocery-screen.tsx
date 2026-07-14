@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getPriceCatalog, getProfile } from "@/lib/data";
 import { useData } from "@/lib/hooks/use-data";
 import { useGroceryList } from "@/lib/hooks/use-grocery-list";
-import type { GroceryLine } from "@/lib/grocery";
+import { formatPhp, type GroceryLine } from "@/lib/grocery";
 import type { GroceryCategory } from "@/lib/types";
 import { DIETARY_STYLE_LABELS, GROCERY_CATEGORY_LABELS, GROCERY_CATEGORY_ORDER } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -30,10 +30,6 @@ const CATEGORY_ICON: Record<GroceryCategory, typeof Carrot> = {
   frozen: Snowflake,
   other: ShoppingBasket,
 };
-
-function formatPhp(amount: number): string {
-  return `₱${Math.round(amount).toLocaleString()}`;
-}
 
 function formatUpdatedDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-PH", { month: "short", year: "numeric" });
@@ -50,6 +46,7 @@ export function GroceryScreen() {
     clearChecked,
     dietaryStyle,
     weeklyGroceryBudget,
+    pantryOverrides,
     setPantryOverride,
   } = useGroceryList();
   const [detailsKey, setDetailsKey] = useState<string | null>(null);
@@ -194,6 +191,8 @@ export function GroceryScreen() {
           {priceCatalog ? (
             <p className="px-6 text-center text-xs text-muted-foreground">
               Prices: {priceCatalog.source} · Updated {formatUpdatedDate(priceCatalog.lastUpdated)}
+              <br />
+              {priceCatalog.note}
             </p>
           ) : null}
         </>
@@ -229,16 +228,27 @@ export function GroceryScreen() {
                     Assuming you already have some on hand, so this only covers what's left.
                   </p>
                 ) : null}
-                <button
-                  type="button"
+                <Button
+                  variant="accent"
                   onClick={() => {
                     setPantryOverride(detailsLine.key, true);
                     setDetailsKey(null);
                   }}
-                  className="flex h-12 items-center justify-center rounded-2xl bg-accent text-sm font-medium text-accent-foreground transition-transform duration-150 active:scale-95"
                 >
                   I already have this — remove from list
-                </button>
+                </Button>
+                {detailsLine.pantryCredited && pantryOverrides[detailsLine.key] !== false ? (
+                  <Button
+                    variant="ghost"
+                    className="text-muted-foreground"
+                    onClick={() => {
+                      setPantryOverride(detailsLine.key, false);
+                      setDetailsKey(null);
+                    }}
+                  >
+                    Actually, I don't have this — always list it
+                  </Button>
+                ) : null}
               </div>
             </>
           ) : null}

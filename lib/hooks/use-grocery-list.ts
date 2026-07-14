@@ -37,14 +37,21 @@ export function useGroceryList() {
   const [completed, setCompleted] = useState<Record<string, boolean>>({});
   const [checked, setChecked] = useState<Record<string, boolean>>({});
 
-  // localStorage is client-only; hydrate after the plan range loads so the
-  // date keys needed to look up extras are known.
-  useEffect(() => {
+  // Pulls extras/completed fresh from localStorage. Other screens (Today,
+  // Plan) mutate that storage directly when a meal is marked eaten or
+  // quick-added — call this after such an action so this hook's own copy
+  // (and anything computed from it, like the remaining-items count) doesn't
+  // go stale until an unrelated re-render happens to pick it up.
+  const refresh = useCallback(() => {
     if (!planRange) return;
     setExtras(planRange.flatMap((day) => loadExtraMeals(day.date)));
     setCompleted(loadCompletedMeals());
     setChecked(loadCheckedItems());
   }, [planRange]);
+
+  // localStorage is client-only; hydrate after the plan range loads so the
+  // date keys needed to look up extras are known.
+  useEffect(refresh, [refresh]);
 
   const recipesById = useMemo(() => new Map((recipes ?? []).map((r) => [r.id, r])), [recipes]);
 
@@ -81,6 +88,7 @@ export function useGroceryList() {
     checked,
     toggleChecked,
     clearChecked,
+    refresh,
     dietaryStyle,
     ...shopping,
   };

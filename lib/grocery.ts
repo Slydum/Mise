@@ -6,6 +6,28 @@ export function canonicalKey(name: string): string {
   return name.trim().toLowerCase();
 }
 
+/** Formats a peso amount for display, e.g. `formatPhp(1234.5)` -> "₱1,235". */
+export function formatPhp(amount: number): string {
+  return `₱${Math.round(amount).toLocaleString()}`;
+}
+
+// Warn (once per key, dev only) when a recipe ingredient has no matching
+// catalog entry, or disagrees on unit — otherwise it silently prices at ₱0
+// with a meaningless package label instead of surfacing the data gap.
+const warnedCatalogKeys = new Set<string>();
+function checkCatalogEntry(key: string, name: string, unit: Unit, entry: PriceCatalogEntry | undefined): void {
+  if (process.env.NODE_ENV === "production" || warnedCatalogKeys.has(key)) return;
+  if (!entry) {
+    warnedCatalogKeys.add(key);
+    console.warn(`[grocery] No SM price catalog entry for "${name}" (key "${key}") — will price at ₱0.`);
+  } else if (entry.unit !== unit) {
+    warnedCatalogKeys.add(key);
+    console.warn(
+      `[grocery] "${name}" is recorded in ${unit} but its catalog entry uses ${entry.unit} — quantities won't merge correctly.`,
+    );
+  }
+}
+
 export interface GroceryLine {
   key: string;
   name: string;
@@ -110,6 +132,7 @@ export function buildGroceryList({
 
   for (const [key, need] of rawNeeded) {
     const catalogEntry = PRICE_CATALOG[key];
+    checkCatalogEntry(key, need.name, need.unit, catalogEntry);
     const override = pantryOverrides[key];
 
     if (override === true) continue; // user says they already have enough
@@ -189,7 +212,9 @@ export function summarizeDay(
     if (!recipe) continue;
     const scale = householdSize / recipe.servings;
     for (const ingredient of recipe.ingredients) {
-      const catalogEntry = PRICE_CATALOG[canonicalKey(ingredient.name)];
+      const key = canonicalKey(ingredient.name);
+      const catalogEntry = PRICE_CATALOG[key];
+      checkCatalogEntry(key, ingredient.name, ingredient.unit, catalogEntry);
       if (!catalogEntry || catalogEntry.pantryStaple) continue;
       const scaledAmount = ingredient.amount * scale;
       const packagesNeeded = Math.max(1, Math.ceil(scaledAmount / catalogEntry.packageAmount));

@@ -75,6 +75,7 @@ export const PRICE_CATALOG: Record<string, PriceCatalogEntry> = {
   "pita bread": { name: "Pita bread", category: "grains", unit: "pc", packageAmount: 6, packageLabel: "6-pc pack", pricePhp: 75 },
 
   // Pantry — scales with recipe use (canned/perishable-ish) ------------------
+  "red lentils": { name: "Red lentils", category: "pantry", unit: "g", packageAmount: 500, packageLabel: "500 g pack", pricePhp: 110 },
   "chopped tomatoes": { name: "Chopped tomatoes", category: "pantry", unit: "pc", packageAmount: 1, packageLabel: "1 can (400 g)", pricePhp: 45 },
   "chickpeas": { name: "Chickpeas", category: "pantry", unit: "pc", packageAmount: 1, packageLabel: "1 can (400 g)", pricePhp: 48 },
   "coconut milk": { name: "Coconut milk", category: "pantry", unit: "pc", packageAmount: 1, packageLabel: "1 can (400 ml)", pricePhp: 55 },
@@ -83,7 +84,7 @@ export const PRICE_CATALOG: Record<string, PriceCatalogEntry> = {
   "hummus": { name: "Hummus", category: "pantry", unit: "g", packageAmount: 200, packageLabel: "200 g tub", pricePhp: 135 },
 
   // Pantry — long shelf-life staples, assumed already partly stocked --------
-  "chia seeds": { name: "Chia seeds", category: "pantry", unit: "ml", packageAmount: 200, packageLabel: "~200 g pouch", pricePhp: 220, pantryStaple: true },
+  "chia seeds": { name: "Chia seeds", category: "pantry", unit: "ml", packageAmount: 200, packageLabel: "~200 ml pouch", pricePhp: 220, pantryStaple: true },
   "maple syrup": { name: "Maple syrup", category: "pantry", unit: "ml", packageAmount: 250, packageLabel: "250 ml bottle", pricePhp: 320, pantryStaple: true },
   "honey": { name: "Honey", category: "pantry", unit: "ml", packageAmount: 350, packageLabel: "350 ml jar", pricePhp: 185, pantryStaple: true },
   "chili flakes": { name: "Chili flakes", category: "pantry", unit: "ml", packageAmount: 50, packageLabel: "50 ml jar", pricePhp: 85, pantryStaple: true },

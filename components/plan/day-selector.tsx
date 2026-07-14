@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { formatWeekdayShort, fromDateKey, isToday } from "@/lib/dates";
-import type { DaySummary } from "@/lib/grocery";
+import { formatPhp, type DaySummary } from "@/lib/grocery";
 import { cn } from "@/lib/utils";
 
 interface DaySelectorProps {
@@ -14,11 +14,6 @@ interface DaySelectorProps {
 }
 
 const MAX_DOTS = 4;
-
-function formatPhpShort(amount: number): string {
-  if (amount <= 0) return "";
-  return `₱${Math.round(amount).toLocaleString()}`;
-}
 
 /** Slim date rail — each chip also surfaces meal count, completion, and estimated cost for that day. */
 export function DaySelector({ dateKeys, selected, onSelect, summaries }: DaySelectorProps) {
@@ -40,7 +35,8 @@ export function DaySelector({ dateKeys, selected, onSelect, summaries }: DaySele
         const today = isToday(key);
         const summary = summaries?.[key];
         const dotCount = summary ? Math.min(summary.mealCount, MAX_DOTS) : 0;
-        const costLabel = summary ? formatPhpShort(summary.estimatedCostPhp) : "";
+        const completedCount = summary?.completedCount ?? 0;
+        const costLabel = summary && summary.estimatedCostPhp > 0 ? formatPhp(summary.estimatedCostPhp) : "";
 
         return (
           <button
@@ -50,13 +46,15 @@ export function DaySelector({ dateKeys, selected, onSelect, summaries }: DaySele
             role="tab"
             aria-selected={active}
             aria-label={`${formatWeekdayShort(date)} ${date.getDate()}${today ? ", today" : ""}${
-              summary ? `, ${summary.mealCount} meals, ${summary.completedCount} done, about ${formatPhpShort(summary.estimatedCostPhp)}` : ""
+              summary
+                ? `, ${summary.mealCount} meals, ${completedCount} done, about ${formatPhp(summary.estimatedCostPhp)}`
+                : ""
             }`}
             onClick={() => onSelect(key)}
             className={cn(
               "flex h-20 w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-95",
               active ? "bg-primary text-primary-foreground shadow-soft" : "text-muted-foreground",
-              today && !active && "ring-1 ring-inset ring-highlight",
+              today && "ring-1 ring-inset ring-highlight",
             )}
           >
             <span className="text-[10px] font-medium uppercase tracking-wide opacity-80">

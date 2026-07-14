@@ -45,7 +45,7 @@ export function TodayScreen() {
 
   const recipes = useData(getRecipes);
   const profile = useData(getProfile);
-  const { groceryList, checked: checkedGrocery } = useGroceryList();
+  const { groceryList, checked: checkedGrocery, refresh: refreshGroceryList } = useGroceryList();
   const loadPlan = useCallback(
     () => getDayPlan(dateKey, dietaryStyle, { avoidTerms, ranking }),
     [dateKey, dietaryStyle, avoidTerms, ranking],
@@ -126,11 +126,15 @@ export function TodayScreen() {
       saveCompletedMeals(next);
       return next;
     });
+    // Completing a meal changes what's still needed for this week's shop.
+    refreshGroceryList();
   };
 
   const handleQuickAdd = (mealType: MealType, recipe: Recipe) => {
     const meal = addExtraMeal(dateKey, mealType, recipe.id);
     setExtras((prev) => [...prev, meal]);
+    // A quick-added meal adds ingredients to this week's shop.
+    refreshGroceryList();
   };
 
   const handleAddWater = () => {
