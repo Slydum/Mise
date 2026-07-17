@@ -25,12 +25,12 @@ function price(overrides: Partial<CommodityPrice>): CommodityPrice {
 
 describe("classifyPriceFreshness", () => {
   it("a user-verified SM price is fresh within 7 days of verification", () => {
-    const p = price({ source: "user-verified-sm", verifiedAt: "2026-07-10T00:00:00Z" });
+    const p = price({ source: "user-verified", verifiedAt: "2026-07-10T00:00:00Z" });
     expect(classifyPriceFreshness(p, now)).toBe("fresh");
   });
 
   it("a user-verified SM price is stale past 7 days", () => {
-    const p = price({ source: "user-verified-sm", verifiedAt: "2026-06-20T00:00:00Z" });
+    const p = price({ source: "user-verified", verifiedAt: "2026-06-20T00:00:00Z" });
     expect(classifyPriceFreshness(p, now)).toBe("stale");
   });
 
@@ -68,7 +68,7 @@ describe("classifyPriceFreshness", () => {
 
   it("different sources use genuinely different rules for the same age", () => {
     const tenDaysAgo = "2026-07-04T00:00:00Z";
-    const verified = classifyPriceFreshness(price({ source: "user-verified-sm", verifiedAt: tenDaysAgo }), now);
+    const verified = classifyPriceFreshness(price({ source: "user-verified", verifiedAt: tenDaysAgo }), now);
     const receipt = classifyPriceFreshness(price({ source: "receipt", fetchedAt: tenDaysAgo }), now);
     expect(verified).toBe("stale"); // past the 7-day verified window
     expect(receipt).toBe("recent"); // still within the 14-day receipt window

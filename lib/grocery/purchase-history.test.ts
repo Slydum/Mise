@@ -12,7 +12,7 @@ describe("purchaseRecordId", () => {
     const base = purchaseRecordId("onion", "sm-fairview", "receipt", { packageAmount: 1, packageUnit: "piece" });
     expect(purchaseRecordId("garlic", "sm-fairview", "receipt", { packageAmount: 1, packageUnit: "piece" })).not.toBe(base);
     expect(purchaseRecordId("onion", "sm-north-edsa", "receipt", { packageAmount: 1, packageUnit: "piece" })).not.toBe(base);
-    expect(purchaseRecordId("onion", "sm-fairview", "user-verified-sm", { packageAmount: 1, packageUnit: "piece" })).not.toBe(
+    expect(purchaseRecordId("onion", "sm-fairview", "user-verified", { packageAmount: 1, packageUnit: "piece" })).not.toBe(
       base,
     );
     expect(purchaseRecordId("onion", "sm-fairview", "receipt", { packageAmount: 2, packageUnit: "piece" })).not.toBe(base);

@@ -3,14 +3,14 @@ import type { CommodityPrice } from "@/lib/pricing/types";
 
 export interface PriceMatchContext {
   canonicalIngredientKey: string;
-  /** Exact-package context — required to match a receipt, a user-verified SM price, or a DTI monitored package. Irrelevant to PSA references, which price the commodity, not a package. */
+  /** Exact-package context — required to match a receipt, a user-verified price, or a DTI monitored package. Irrelevant to PSA references, which price the commodity, not a package. */
   packageAmount?: number;
   packageUnit?: string;
   storeId?: string;
 }
 
 /**
- * Lower number = higher priority. Receipt and user-verified SM prices are
+ * Lower number = higher priority. Receipt and user-verified prices are
  * exact-product tiers; DTI is an exact monitored package but not
  * store-specific; PSA splits into four geographic sub-tiers, each strictly
  * below DTI, so a broad commodity reference can never outrank a real
@@ -20,7 +20,7 @@ function tierOf(price: CommodityPrice): number {
   switch (price.source) {
     case "receipt":
       return 1;
-    case "user-verified-sm":
+    case "user-verified":
       return 2;
     case "dti-epresyo":
       return 3;
@@ -37,7 +37,7 @@ function matchesRequiredContext(price: CommodityPrice, context: PriceMatchContex
 
   switch (price.source) {
     case "receipt":
-    case "user-verified-sm":
+    case "user-verified":
       // A price logged for one package size/branch never silently substitutes for another.
       return (
         price.amount === context.packageAmount &&
@@ -65,7 +65,7 @@ function psaTieBreak(a: CommodityPrice, b: CommodityPrice): number {
 
 /**
  * Resolves the single price to use for a grocery item, per the 8-tier
- * priority (receipt > user-verified SM > DTI > PSA city > province > region
+ * priority (receipt > user-verified > DTI > PSA city > province > region
  * > national > unavailable). Never lets one package size's price stand in
  * for another, and never promotes a PSA/DTI commodity reference to
  * `isExactStorePrice`.

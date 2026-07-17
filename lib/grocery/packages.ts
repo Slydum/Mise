@@ -97,7 +97,7 @@ function toKgOrLiter(amount: number, baseUnit: string): { amount: number; kind: 
  *     (or per liter) — a market-reference/expected cost, not a guaranteed
  *     checkout price. Unavailable if the usage unit has no per-kg/per-liter
  *     meaning (e.g. "piece", "bunch") or the resolved price lacks that rate.
- *   - Every other source (receipt, user-verified-sm, dti-epresyo): checkout
+ *   - Every other source (receipt, user-verified, dti-epresyo): checkout
  *     cost = packageCount * packagePricePhp — an exact, real cost.
  */
 function computePriceInfo(

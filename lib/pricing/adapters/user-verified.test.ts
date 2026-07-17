@@ -26,22 +26,40 @@ describe("purchaseRecordToCommodityPrice", () => {
     expect(commodity.referencePeriod).toBe("2026-05");
   });
 
-  it("stamps verifiedAt only for a user-verified-sm record, not for a receipt", () => {
-    const verified = purchaseRecordToCommodityPrice(record({ source: "user-verified-sm", purchasedAt: "2026-07-10T00:00:00Z" }), "Canned tuna");
+  it("stamps verifiedAt only for a user-verified record, not for a receipt", () => {
+    const verified = purchaseRecordToCommodityPrice(record({ source: "user-verified", purchasedAt: "2026-07-10T00:00:00Z" }), "Canned tuna");
     const receipt = purchaseRecordToCommodityPrice(record({ source: "receipt" }), "Canned tuna");
     expect(verified.verifiedAt).toBe("2026-07-10T00:00:00Z");
     expect(receipt.verifiedAt).toBeUndefined();
   });
 
-  it("carries the correct sourceLabel for each kind", () => {
-    expect(purchaseRecordToCommodityPrice(record({ source: "receipt" }), "x").sourceLabel).toBe("Last paid at SM");
-    expect(purchaseRecordToCommodityPrice(record({ source: "user-verified-sm" }), "x").sourceLabel).toBe("Verified at SM");
+  it("builds a store-specific sourceLabel when a store name is given", () => {
+    expect(purchaseRecordToCommodityPrice(record({ source: "receipt" }), "x", "Puregold Imus").sourceLabel).toBe("Last paid at Puregold Imus");
+    expect(purchaseRecordToCommodityPrice(record({ source: "user-verified" }), "x", "SM Supermarket Fairview").sourceLabel).toBe(
+      "Verified at SM Supermarket Fairview",
+    );
+  });
+
+  it("falls back to a generic label when no store name is available", () => {
+    expect(purchaseRecordToCommodityPrice(record({ source: "receipt" }), "x").sourceLabel).toBe("Last paid price");
+    expect(purchaseRecordToCommodityPrice(record({ source: "user-verified" }), "x").sourceLabel).toBe("Verified in-store");
   });
 });
 
 describe("purchaseRecordsToCommodityPrices", () => {
-  it("resolves a display name for each record via the provided lookup", () => {
-    const [commodity] = purchaseRecordsToCommodityPrices([record({})], (key) => `Display: ${key}`);
+  it("resolves a display name and a store name for each record via the provided lookups", () => {
+    const [commodity] = purchaseRecordsToCommodityPrices(
+      [record({ storeId: "puregold-imus" })],
+      (key) => `Display: ${key}`,
+      (storeId) => (storeId === "puregold-imus" ? "Puregold Imus" : undefined),
+    );
     expect(commodity.displayName).toBe("Display: canned tuna");
+    expect(commodity.storeName).toBe("Puregold Imus");
+    expect(commodity.sourceLabel).toBe("Last paid at Puregold Imus");
+  });
+
+  it("never invents a store name the resolver didn't provide", () => {
+    const [commodity] = purchaseRecordsToCommodityPrices([record({})], (key) => key, () => undefined);
+    expect(commodity.storeName).toBeUndefined();
   });
 });

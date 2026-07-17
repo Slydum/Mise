@@ -18,8 +18,10 @@ export type PackageForm =
  * *shape* only (size, unit, form). This is reference data about retail
  * packaging conventions, not a price: it exists so package-count math
  * ("you need 400g, that's sold in 1kg bags, so buy 1") works before any
- * price is known. See lib/sm/adapter.ts for why there's no price here —
- * Mise has no live SM Markets integration, so prices are never seeded.
+ * price is known. Mise has no live supermarket integration, so prices are
+ * never seeded here — see lib/pricing/ for how real prices (PSA/DTI
+ * references, or the user's own logged receipts/verifications) attach
+ * separately.
  */
 export interface RetailPackage {
   form: PackageForm;

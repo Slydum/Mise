@@ -32,7 +32,7 @@ describe("resolvePrice", () => {
     const candidates = [
       price({ id: "psa", source: "psa-openstat", region: "CALABARZON", pricePhp: 90 }),
       price({ id: "dti", source: "dti-epresyo", pricePhp: 85, isExactStorePrice: false }),
-      price({ id: "verified", source: "user-verified-sm", pricePhp: 88, storeId: "sm-fairview", isExactStorePrice: true }),
+      price({ id: "verified", source: "user-verified", pricePhp: 88, storeId: "sm-fairview", isExactStorePrice: true }),
       price({ id: "receipt", source: "receipt", pricePhp: 92, storeId: "sm-fairview", isExactStorePrice: true }),
     ];
     expect(resolvePrice(context, candidates)?.id).toBe("receipt");
@@ -42,7 +42,7 @@ describe("resolvePrice", () => {
     const candidates = [
       price({ id: "psa", source: "psa-openstat", region: "CALABARZON" }),
       price({ id: "dti", source: "dti-epresyo" }),
-      price({ id: "verified", source: "user-verified-sm", storeId: "sm-fairview", isExactStorePrice: true }),
+      price({ id: "verified", source: "user-verified", storeId: "sm-fairview", isExactStorePrice: true }),
     ];
     expect(resolvePrice(context, candidates)?.id).toBe("verified");
   });

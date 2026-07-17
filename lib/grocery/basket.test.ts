@@ -91,7 +91,7 @@ describe("summarizeBasket", () => {
   it("is fully verified at store only when every item is an exact SM price confirmed at the given store", () => {
     const items = [
       item({ id: "a", priceInfo: priceInfo({ price: commodityPrice({ source: "receipt", storeId: "sm-fairview" }) }) }),
-      item({ id: "b", priceInfo: priceInfo({ price: commodityPrice({ source: "user-verified-sm", storeId: "sm-fairview" }) }) }),
+      item({ id: "b", priceInfo: priceInfo({ price: commodityPrice({ source: "user-verified", storeId: "sm-fairview" }) }) }),
     ];
     expect(summarizeBasket(items, 3000, "sm-fairview").isFullyVerifiedAtStore).toBe(true);
   });

@@ -6,7 +6,7 @@ import { psaSituationerAdapter } from "@/lib/pricing/adapters/psa-situationer";
 import { dtiEpresyoAdapter } from "@/lib/pricing/adapters/dti-epresyo";
 import type { CommodityPrice, PriceAdapterParams } from "@/lib/pricing/types";
 import { resolveDayMeals } from "@/lib/data/plan-overrides";
-import { loadPantryItems, loadPurchaseHistory } from "@/lib/data/local-store";
+import { loadPantryItems, loadPurchaseHistory, loadShoppingSettings } from "@/lib/data/local-store";
 import { addDays, fromDateKey, toDateKey, todayKey } from "@/lib/dates";
 import type { DietaryStyle, GroceryItem } from "@/lib/types";
 
@@ -17,7 +17,9 @@ const GENERATION_DAYS = 7;
  * pricing source (see lib/pricing/): PSA OpenSTAT, PSA Price Situationer,
  * and DTI e-Presyo — all of which honestly return no data today, since
  * there's no live connection (see lib/pricing/adapters/*.ts) — plus the
- * user's own local purchase history, the only source with real data.
+ * user's own local purchase history across every store they've logged,
+ * the only source with real data (lib/pricing/priority.ts's storeId match
+ * later narrows this to the one currently selected).
  */
 async function gatherPriceCandidates(
   location: PriceAdapterParams,
@@ -28,9 +30,11 @@ async function gatherPriceCandidates(
     psaSituationerAdapter.fetchPrices(location),
     dtiEpresyoAdapter.fetchPrices(location),
   ]);
+  const storeNameById = new Map(loadShoppingSettings().stores.map((s) => [s.storeId, s.storeName]));
   const userVerified = purchaseRecordsToCommodityPrices(
     loadPurchaseHistory(),
     (canonicalKey) => displayNameByKey.get(canonicalKey) ?? canonicalKey,
+    (storeId) => storeNameById.get(storeId),
   );
   return [...psaOpenStat.prices, ...psaSituationer.prices, ...dti.prices, ...userVerified];
 }
@@ -48,10 +52,10 @@ async function gatherPriceCandidates(
  * base servings — a recipe written for 4 servings feeding a household of 2
  * scales every ingredient by 2/4, not by 1.
  *
- * `storeId` scopes which purchase-history records count as an exact SM
- * price; `location` (region/province/city) scopes PSA/DTI lookups. Neither
- * is required to see quantities — only to see pricing (see
- * ShoppingSettings in lib/types.ts).
+ * `storeId` (the current store, see ShoppingSettings.currentStoreId) scopes
+ * which purchase-history records count as an exact price for this list;
+ * `location` (region/province/city) scopes PSA/DTI lookups. Neither is
+ * required to see quantities — only to see pricing.
  */
 export async function generateGroceryItems(
   dietaryStyle: DietaryStyle,

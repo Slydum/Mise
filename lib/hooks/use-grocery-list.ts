@@ -33,12 +33,13 @@ export interface UseGroceryListResult {
   addToPantry: (name: string) => void;
   removeFromPantry: (name: string) => void;
   /**
-   * Logs a receipt price (what the user actually paid) or a manual SM
-   * verification (confirmed accurate today, without necessarily buying) —
-   * history/verification, never presented as a live current price. No-ops
-   * without a selected store.
+   * Logs a receipt price (what the user actually paid) or a manual
+   * verification (confirmed accurate today, without necessarily buying) at
+   * the given store — history/verification, never presented as a live
+   * current price. The store doesn't have to be the current/default one;
+   * any store the user names is logged.
    */
-  logPurchasePrice: (item: GroceryItem, pricePhp: number, source: PurchaseRecord["source"]) => void;
+  logPurchasePrice: (item: GroceryItem, pricePhp: number, storeId: string, source: PurchaseRecord["source"]) => void;
   refresh: () => void;
 }
 
@@ -145,8 +146,7 @@ export function useGroceryList(
   );
 
   const logPurchasePrice = useCallback(
-    (item: GroceryItem, pricePhp: number, source: PurchaseRecord["source"]) => {
-      if (!storeId) return;
+    (item: GroceryItem, pricePhp: number, storeId: string, source: PurchaseRecord["source"]) => {
       const canonicalKey = item.canonicalKey ?? getCanonicalKey(item.name);
       const context = { packageAmount: item.packageAmount, packageUnit: item.packageUnit };
       const record: PurchaseRecord = {
@@ -163,7 +163,7 @@ export function useGroceryList(
       savePurchaseRecord(record);
       refresh();
     },
-    [refresh, storeId],
+    [refresh],
   );
 
   return {

@@ -184,14 +184,6 @@ export function hasRecipeContent(recipe: Recipe): boolean {
 }
 
 /**
- * Freshness of a *live* SM Markets price. Mise has no live SM integration
- * deployed (see lib/sm/adapter.ts) — every item is "unavailable" today. The
- * enum exists so a real adapter can report real freshness later without a
- * GroceryItem shape change.
- */
-export type LivePriceStatus = "live" | "recently-checked" | "refresh-required" | "unavailable";
-
-/**
  * The resolved price behind a grocery row, per the unified official-pricing
  * model in lib/pricing/ (PSA OpenSTAT/Price Situationer, DTI e-Presyo, and
  * the user's own SM verifications/receipts — see lib/pricing/priority.ts
@@ -200,7 +192,7 @@ export type LivePriceStatus = "live" | "recently-checked" | "refresh-required" |
  */
 export interface GroceryItemPriceInfo {
   price: CommodityPrice;
-  /** Number of packages to buy — only meaningful for exact-package sources (receipt/user-verified-sm/dti-epresyo), not PSA per-kg references. */
+  /** Number of packages to buy — only meaningful for exact-package sources (receipt/user-verified/dti-epresyo), not PSA per-kg references. */
   packageCount?: number;
   /** packageCount * price.pricePhp for an exact package, or requiredWeightKg * price.pricePerKgPhp for a PSA reference. */
   lineTotalPhp: number;
@@ -251,24 +243,28 @@ export interface UserProfile {
 export type PricingMode = "normal" | "conservative";
 
 /**
- * The user's exact SM Markets branch — "SM Markets" alone is not a price
- * location. There's no live SM store directory Mise can query, so the user
- * types this in themselves; storeId is derived locally from name+city so
- * purchase history and (eventually) live prices can be scoped to it.
+ * A store the user actually shops at — any supermarket, not just SM. There's
+ * no live store directory Mise can query for arbitrary chains, so the user
+ * types this in themselves (optionally assisted by nearby-SM search); storeId
+ * is derived locally from name+city so purchase history and prices can be
+ * scoped to it. "SM Markets" alone is never a valid entry — a store always
+ * needs its exact branch/city.
  */
-export interface SmStore {
+export interface ShoppingStore {
   storeId: string;
   storeName: string;
   storeCity: string;
   storeAddress?: string;
-  selectedAt: string;
+  addedAt: string;
 }
 
 /** Shopping preferences, kept local-first like dietary style and food preferences (see lib/data/local-store.ts). */
 export interface ShoppingSettings {
-  /** Required before any pricing is requested or shown — see components/profile/shopping-settings-card.tsx. */
-  store: SmStore | null;
-  /** Philippine geographic location used for PSA/DTI reference lookups (see lib/pricing/geographic.ts) — separate from `store`, which is only used for user-confirmed/receipt SM prices. */
+  /** Every store the user has added or logged a price at. */
+  stores: ShoppingStore[];
+  /** Which store's prices to show right now — the default for new price logs and what the Grocery basket total is scoped to. Null until the user picks one. */
+  currentStoreId: string | null;
+  /** Philippine geographic location used for PSA/DTI reference lookups (see lib/pricing/geographic.ts) — separate from `stores`, which is only used for user-confirmed/receipt prices. */
   region?: string;
   province?: string;
   city?: string;
@@ -279,8 +275,14 @@ export interface ShoppingSettings {
 }
 
 export const DEFAULT_SHOPPING_SETTINGS: ShoppingSettings = {
-  store: null,
+  stores: [],
+  currentStoreId: null,
   weeklyBudgetPhp: 3000,
   pricingMode: "normal",
   householdSize: 2,
 };
+
+/** The store `currentStoreId` refers to, or undefined if unset/stale. */
+export function getCurrentStore(settings: ShoppingSettings): ShoppingStore | undefined {
+  return settings.stores.find((s) => s.storeId === settings.currentStoreId);
+}

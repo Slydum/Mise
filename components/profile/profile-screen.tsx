@@ -38,7 +38,12 @@ export function ProfileScreen() {
     addFavorite,
     removeFavorite,
   } = useFoodPreferences();
-  const { settings: shoppingSettings, updateSettings: updateShoppingSettings, setStore } = useShoppingSettings();
+  const {
+    settings: shoppingSettings,
+    updateSettings: updateShoppingSettings,
+    addStore,
+    setCurrentStore,
+  } = useShoppingSettings();
   const savedCount = Object.keys(favorites).length;
   const { message: toastMessage, showToast } = useToast();
 
@@ -186,15 +191,19 @@ export function ProfileScreen() {
             <h2 className="px-1 font-serif text-2xl">Shopping</h2>
             <Card>
               <CardHeader>
-                <CardTitle className="font-serif text-xl font-normal">SM Markets &amp; budget</CardTitle>
+                <CardTitle className="font-serif text-xl font-normal">Stores &amp; budget</CardTitle>
               </CardHeader>
               <CardContent>
                 <ShoppingSettingsCard
                   settings={shoppingSettings}
                   onChange={withToast(updateShoppingSettings)}
-                  onSetStore={(storeName, storeCity, storeAddress) => {
-                    setStore(storeName, storeCity, storeAddress);
+                  onAddStore={(storeName, storeCity, storeAddress) => {
+                    addStore(storeName, storeCity, storeAddress);
                     showToast("Store saved");
+                  }}
+                  onSetCurrentStore={(storeId) => {
+                    setCurrentStore(storeId);
+                    showToast("Shopping here now");
                   }}
                 />
               </CardContent>

@@ -20,7 +20,7 @@ import { describeBasketOutlook, summarizeBasket, type BasketOutlook } from "@/li
 import { formatApproxPhp, formatPhp } from "@/lib/grocery/currency";
 import { formatQuantity } from "@/lib/ingredients";
 import type { GroceryCategory, GroceryItem } from "@/lib/types";
-import { GROCERY_CATEGORY_LABELS, GROCERY_CATEGORY_ORDER } from "@/lib/types";
+import { GROCERY_CATEGORY_LABELS, GROCERY_CATEGORY_ORDER, getCurrentStore } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_EMOJI: Record<GroceryCategory, string> = {
@@ -34,7 +34,7 @@ const CATEGORY_EMOJI: Record<GroceryCategory, string> = {
 };
 
 const OUTLOOK_LABELS: Record<BasketOutlook, string> = {
-  verified: "Verified SM basket",
+  verified: "Verified basket",
   projected: "Projected grocery basket",
   unavailable: "Current grocery outlook",
 };
@@ -43,13 +43,13 @@ const MANUAL_ID_PREFIX = "extra-manual-";
 
 export function GroceryScreen() {
   const { dietaryStyle } = useDietaryStyle();
-  const { settings: shoppingSettings } = useShoppingSettings();
-  const store = shoppingSettings.store;
+  const { settings: shoppingSettings, addStore } = useShoppingSettings();
+  const store = getCurrentStore(shoppingSettings);
   const location = useMemo(
     () => ({ region: shoppingSettings.region, province: shoppingSettings.province, city: shoppingSettings.city }),
     [shoppingSettings.region, shoppingSettings.province, shoppingSettings.city],
   );
-  const grocery = useGroceryList(dietaryStyle, shoppingSettings.householdSize, store?.storeId ?? null, location);
+  const grocery = useGroceryList(dietaryStyle, shoppingSettings.householdSize, shoppingSettings.currentStoreId, location);
   const { message: toastMessage, showToast } = useToast();
 
   const [hideCompleted, setHideCompleted] = useState(false);
@@ -76,8 +76,8 @@ export function GroceryScreen() {
   const anyChecked = doneCount > 0;
 
   const basket = useMemo(
-    () => summarizeBasket(grocery.items, shoppingSettings.weeklyBudgetPhp, store?.storeId ?? null),
-    [grocery.items, shoppingSettings.weeklyBudgetPhp, store?.storeId],
+    () => summarizeBasket(grocery.items, shoppingSettings.weeklyBudgetPhp, shoppingSettings.currentStoreId),
+    [grocery.items, shoppingSettings.weeklyBudgetPhp, shoppingSettings.currentStoreId],
   );
   const outlook = useMemo(() => describeBasketOutlook(basket), [basket]);
 
@@ -129,7 +129,7 @@ export function GroceryScreen() {
     <div className="flex flex-col gap-6 animate-fade-up">
       <ScreenHeader
         title="Grocery"
-        subtitle={store ? `SM Markets — ${store.storeName}` : "Select your SM store in Profile"}
+        subtitle={store ? `Shopping at ${store.storeName}` : "Add a store in Profile to see pricing"}
       >
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" onClick={() => setPantryOpen(true)} aria-label="My Pantry">
@@ -161,9 +161,10 @@ export function GroceryScreen() {
             <MapPin className="size-4.5" aria-hidden />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block font-medium">Select your SM store to see pricing</span>
+            <span className="block font-medium">Add a store to see pricing</span>
             <span className="block text-sm text-muted-foreground">
-              "SM Markets" alone isn't specific enough — pick your exact branch in Profile.
+              Any supermarket you actually shop at — add it in Profile, or log a price below and we'll add it for
+              you.
             </span>
           </span>
         </Link>
@@ -377,11 +378,13 @@ export function GroceryScreen() {
           if (!open) setPriceDetailItem(null);
         }}
         item={priceDetailItem}
-        storeName={store?.storeName}
+        stores={shoppingSettings.stores}
+        currentStoreId={shoppingSettings.currentStoreId}
         city={shoppingSettings.city ?? store?.storeCity}
-        onLogPrice={(pricePhp, source) => {
+        onLogPrice={(pricePhp, source, storeInput) => {
           if (priceDetailItem) {
-            grocery.logPurchasePrice(priceDetailItem, pricePhp, source);
+            const savedStore = addStore(storeInput.storeName, storeInput.storeCity, storeInput.storeAddress);
+            grocery.logPurchasePrice(priceDetailItem, pricePhp, savedStore.storeId, source);
             showToast(source === "receipt" ? "Receipt price logged" : "Price verified");
           }
         }}

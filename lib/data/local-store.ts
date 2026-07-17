@@ -28,7 +28,7 @@ const KEYS = {
   groceryExtra: "mise.grocery.extra.v1",
   pantryItems: "mise.pantry.v1",
   purchaseHistory: "mise.grocery.purchaseHistory.v1",
-  shoppingSettings: "mise.profile.shopping.v2",
+  shoppingSettings: "mise.profile.shopping.v3",
 } as const;
 
 function read<T>(key: string, fallback: T): T {

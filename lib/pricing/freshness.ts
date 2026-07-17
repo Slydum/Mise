@@ -33,7 +33,7 @@ const RECEIPT_RECENT_DAYS = 14;
  */
 export function classifyPriceFreshness(price: CommodityPrice, now: Date = new Date()): FreshnessLevel {
   switch (price.source) {
-    case "user-verified-sm":
+    case "user-verified":
       return daysSince(price.verifiedAt ?? price.fetchedAt, now) <= USER_VERIFIED_FRESH_DAYS ? "fresh" : "stale";
     case "receipt":
       return daysSince(price.fetchedAt, now) <= RECEIPT_RECENT_DAYS ? "recent" : "stale";

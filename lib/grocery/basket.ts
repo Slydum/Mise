@@ -1,7 +1,7 @@
 import type { GroceryItem } from "@/lib/types";
 
 export interface BasketSummary {
-  /** Sum of lineTotalPhp for exact-price items (receipt, user-verified-sm, dti-epresyo). */
+  /** Sum of lineTotalPhp for exact-price items (receipt, user-verified, dti-epresyo). */
   exactTotalPhp: number;
   /** Sum of lineTotalPhp for PSA market-reference items — an expected/usage cost, not a guaranteed checkout price. */
   referenceTotalPhp: number;
@@ -18,11 +18,11 @@ export interface BasketSummary {
 }
 
 /**
- * Splits the basket into exact prices (receipt/user-verified-sm/dti —
- * genuine checkout costs) and PSA market references (expected-cost
- * estimates), per GROCERY UI's "Exact SM and receipt prices" /
- * "Official market references" breakdown. Never sums a value for an item
- * with no priceInfo — that's "Price unavailable," not ₱0.
+ * Splits the basket into exact prices (receipt/user-verified/dti — genuine
+ * checkout costs) and PSA market references (expected-cost estimates), per
+ * GROCERY UI's "Exact and receipt prices" / "Official market references"
+ * breakdown. Never sums a value for an item with no priceInfo — that's
+ * "Price unavailable," not ₱0.
  */
 export function summarizeBasket(items: GroceryItem[], weeklyBudgetPhp: number, storeId: string | null): BasketSummary {
   let exactTotalPhp = 0;
@@ -42,9 +42,9 @@ export function summarizeBasket(items: GroceryItem[], weeklyBudgetPhp: number, s
 
     exactTotalPhp += item.priceInfo.lineTotalPhp;
     const source = item.priceInfo.price.source;
-    const isSmVerifiedHere =
-      (source === "receipt" || source === "user-verified-sm") && item.priceInfo.price.storeId === storeId;
-    if (!isSmVerifiedHere) allExactAtStore = false;
+    const isVerifiedAtStore =
+      (source === "receipt" || source === "user-verified") && item.priceInfo.price.storeId === storeId;
+    if (!isVerifiedAtStore) allExactAtStore = false;
   }
 
   const totalItems = items.length;
@@ -67,8 +67,8 @@ export function summarizeBasket(items: GroceryItem[], weeklyBudgetPhp: number, s
 export type BasketOutlook = "verified" | "projected" | "unavailable";
 
 /**
- * "Verified SM basket" only when every included price was confirmed/paid
- * at the selected branch; "Projected basket" once exact prices and/or PSA
+ * "Verified basket" only when every included price was confirmed/paid at
+ * the current store; "Projected basket" once exact prices and/or PSA
  * references combine; "unavailable" when nothing is priced at all.
  */
 export function describeBasketOutlook(summary: BasketSummary): BasketOutlook {

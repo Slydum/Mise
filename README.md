@@ -75,24 +75,25 @@ To reproduce the Pages build locally:
 STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/Mise npm run build   # outputs ./out
 ```
 
-## Grocery pricing (PSA / DTI / SM)
+## Grocery pricing (PSA / DTI / your own stores)
 
 The Grocery screen shows package sizes and quantities for every ingredient,
 and prices them against a unified official-data model in `lib/pricing/` —
-but **there is no live connection to PSA, DTI, or SM Markets Online in this
-app.** This is a deliberate, honest state, not a missing feature waiting on
-API keys. It was verified directly, not assumed: this session's outbound web
-access is blocked at the environment/proxy level for every external host
-tried, including `openstat.psa.gov.ph`, `dti.gov.ph`, and
-`shop.smmarkets.ph` — confirmed against a neutral control host too, so it's
-an environment constraint, not something specific to any of these sites.
+but **there is no live connection to PSA, DTI, or any supermarket's live
+checkout prices in this app.** This is a deliberate, honest state, not a
+missing feature waiting on API keys. It was verified directly, not assumed:
+this session's outbound web access is blocked at the environment/proxy
+level for every external host tried, including `openstat.psa.gov.ph`,
+`dti.gov.ph`, and `shop.smmarkets.ph` — confirmed against a neutral control
+host too, so it's an environment constraint, not something specific to any
+of these sites.
 
 The pricing model (`lib/pricing/types.ts`'s `CommodityPrice`) unifies five
 sources, in priority order:
 
 1. **Receipt** — what you logged after actually buying something
-2. **User-verified SM** — a price you manually confirmed is currently
-   accurate at your branch, without necessarily buying
+2. **User-verified** — a price you manually confirmed is currently accurate
+   at a store, without necessarily buying
 3. **DTI e-Presyo** — monitored basic-necessity/prime-commodity prices
 4. **PSA Price Situationer** / **PSA OpenSTAT** — official market
    references, always the most locally-specific figure available (city →
@@ -110,9 +111,25 @@ from. Nothing in production ever fabricates a peso amount or shows ₱0 for a
 missing price — a grocery row with no resolved price shows "Price
 unavailable."
 
+### Any store, not just one
+
+Profile → Shopping keeps a list of every store the user has added
+(`ShoppingSettings.stores`, see `lib/types.ts`) — any supermarket, not one
+fixed "preferred" branch. One store is marked `currentStoreId`, which
+decides which store's prices show on the Grocery screen and basket total by
+default; tapping another store in the list switches it. Logging a price
+(receipt or verification) from the price-detail sheet isn't limited to the
+current store either — an inline chip picker lets you name any store,
+including a brand-new one typed on the spot, which is then added to the
+list automatically. A price logged at one store never leaks into another
+(`lib/pricing/priority.ts`'s `storeId` match), and the label always names
+the exact store ("Last paid at Puregold Imus," "Verified at SM Supermarket
+Fairview" — built per-price in
+`lib/pricing/adapters/user-verified.ts`, never a generic "SM" label).
+
 Key distinctions the app enforces everywhere:
 
-- **A PSA/DTI reference is never labeled as an exact SM price.**
+- **A PSA/DTI reference is never labeled as an exact store price.**
   `CommodityPrice.isExactStorePrice` is only ever `true` for a receipt or a
   user verification; PSA/DTI figures are commodity-level market references
   (`GroceryItem.priceInfo.isUsageReference`), not a checkout guarantee.
@@ -121,10 +138,12 @@ Key distinctions the app enforces everywhere:
   rice, fresh vs. canned tuna, salmon vs. tilapia all stay distinct in
   `lib/pricing/commodities.ts`'s mapping table — a missing mapping is
   `commodityName: null`, never a plausible-looking substitute.
-- **An exact store is required for SM-specific pricing.** "SM Markets"
-  alone isn't a price location — Profile → Shopping requires a specific
-  branch (name + city, typed in — there's no live SM store directory to
-  pick from either).
+- **An exact store is required for store-specific pricing.** A chain name
+  alone ("SM Markets," "Puregold") isn't a price location — every store in
+  Profile → Shopping (or named while logging a price) needs its specific
+  branch: name + city, typed in — there's no live store directory to pick
+  from for arbitrary chains, though nearby SM branches specifically can be
+  found via OpenStreetMap search (see below).
 - **"Search prices online"** in the price-detail sheet opens a plain Google
   search in a new tab for the user to read themselves — Mise never reads,
   parses, or trusts search results as a price; it's purely a research aid

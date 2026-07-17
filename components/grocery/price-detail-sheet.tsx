@@ -9,16 +9,26 @@ import { formatApproxPhp, formatPhp } from "@/lib/grocery/currency";
 import { formatQuantity } from "@/lib/ingredients";
 import { geographicLevelLabel, geographicLevelOf } from "@/lib/pricing/geographic";
 import type { PurchaseRecord } from "@/lib/grocery/purchase-history";
-import type { GroceryItem } from "@/lib/types";
+import type { GroceryItem, ShoppingStore } from "@/lib/types";
+import { cn } from "@/lib/utils";
+
+interface LoggedStoreInput {
+  storeName: string;
+  storeCity: string;
+  storeAddress?: string;
+}
 
 interface PriceDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item: GroceryItem | null;
-  storeName?: string;
+  stores: ShoppingStore[];
+  currentStoreId: string | null;
   city?: string;
-  onLogPrice: (pricePhp: number, source: PurchaseRecord["source"]) => void;
+  onLogPrice: (pricePhp: number, source: PurchaseRecord["source"], store: LoggedStoreInput) => void;
 }
+
+const NEW_STORE = "__new__";
 
 function formatReferencePeriod(period: string): string {
   const match = /^(\d{4})-(\d{2})$/.exec(period);
@@ -39,16 +49,26 @@ function searchUrl(query: string): string {
  * Bottom sheet showing the full breakdown behind a grocery row's price (or
  * why one isn't available), and two ways to add real local data: search the
  * web yourself (opens in a new tab — Mise never reads or interprets the
- * results, you decide what to trust), or log a receipt/verified SM price.
+ * results, you decide what to trust), or log a receipt/verified price at
+ * whatever store you actually bought/checked it at — any store, not just a
+ * single preferred one.
  */
-export function PriceDetailSheet({ open, onOpenChange, item, storeName, city, onLogPrice }: PriceDetailSheetProps) {
+export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStoreId, city, onLogPrice }: PriceDetailSheetProps) {
   const [logging, setLogging] = useState<PurchaseRecord["source"] | null>(null);
   const [draftPrice, setDraftPrice] = useState("");
+  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(currentStoreId ?? stores[0]?.storeId ?? NEW_STORE);
+  const [newStoreName, setNewStoreName] = useState("");
+  const [newStoreCity, setNewStoreCity] = useState(city ?? "");
 
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) setLogging(null);
+    if (open) {
+      setLogging(null);
+      setSelectedStoreId(currentStoreId ?? stores[0]?.storeId ?? NEW_STORE);
+      setNewStoreName("");
+      setNewStoreCity(city ?? "");
+    }
   }
 
   if (!item) return null;
@@ -57,7 +77,7 @@ export function PriceDetailSheet({ open, onOpenChange, item, storeName, city, on
   const geoLabel = price
     ? price.city || price.province || price.region
       ? `${geographicLevelLabel(geographicLevelOf(price))} — ${price.city ?? price.province ?? price.region}`
-      : price.storeName ?? storeName
+      : price.storeName
     : undefined;
   const unitPriceLabel = price
     ? price.pricePerKgPhp !== undefined
@@ -67,11 +87,23 @@ export function PriceDetailSheet({ open, onOpenChange, item, storeName, city, on
         : formatPhp(price.pricePhp)
     : undefined;
 
+  const isNewStore = selectedStoreId === NEW_STORE;
+  const canSave =
+    Number.isFinite(Number(draftPrice.replace(/[^0-9.]/g, ""))) &&
+    draftPrice.trim().length > 0 &&
+    (isNewStore ? newStoreName.trim().length > 0 && newStoreCity.trim().length > 0 : selectedStoreId !== null);
+
   const handleSave = () => {
-    if (!logging) return;
+    if (!logging || !canSave) return;
     const parsed = Number(draftPrice.replace(/[^0-9.]/g, ""));
     if (!Number.isFinite(parsed) || parsed < 0) return;
-    onLogPrice(parsed, logging);
+    const store = isNewStore
+      ? { storeName: newStoreName.trim(), storeCity: newStoreCity.trim() }
+      : (() => {
+          const s = stores.find((st) => st.storeId === selectedStoreId)!;
+          return { storeName: s.storeName, storeCity: s.storeCity, storeAddress: s.storeAddress };
+        })();
+    onLogPrice(parsed, logging, store);
     setLogging(null);
     setDraftPrice("");
   };
@@ -82,7 +114,7 @@ export function PriceDetailSheet({ open, onOpenChange, item, storeName, city, on
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent>
         <SheetTitle>{item.name}</SheetTitle>
-        <div className="flex flex-col gap-4 px-6 pb-6 pt-4">
+        <div className="flex flex-col gap-4 overflow-y-auto px-6 pb-6 pt-4">
           <dl className="flex flex-col divide-y divide-border/60 rounded-2xl border border-border/60">
             <Row
               label="Needed for your plan"
@@ -125,7 +157,7 @@ export function PriceDetailSheet({ open, onOpenChange, item, storeName, city, on
                 ) : null}
               </>
             ) : (
-              <Row label="Price" value="Price unavailable" hint="No PSA, DTI, or verified SM price is available for this item yet." />
+              <Row label="Price" value="Price unavailable" hint="No PSA, DTI, or logged price is available for this item yet." />
             )}
           </dl>
 
@@ -146,8 +178,53 @@ export function PriceDetailSheet({ open, onOpenChange, item, storeName, city, on
 
           {logging ? (
             <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                <p className="text-sm font-medium text-muted-foreground">Which store?</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {stores.map((s) => (
+                    <button
+                      key={s.storeId}
+                      type="button"
+                      onClick={() => setSelectedStoreId(s.storeId)}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        selectedStoreId === s.storeId ? "border-primary bg-primary/10" : "border-border/60 text-muted-foreground",
+                      )}
+                    >
+                      {s.storeName}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStoreId(NEW_STORE)}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      isNewStore ? "border-primary bg-primary/10" : "border-border/60 text-muted-foreground",
+                    )}
+                  >
+                    + New store
+                  </button>
+                </div>
+                {isNewStore ? (
+                  <div className="mt-1 flex flex-col gap-2">
+                    <Input
+                      placeholder="Store name, e.g. Puregold Imus"
+                      value={newStoreName}
+                      onChange={(e) => setNewStoreName(e.target.value)}
+                      aria-label="Store name"
+                    />
+                    <Input
+                      placeholder="City / area"
+                      value={newStoreCity}
+                      onChange={(e) => setNewStoreCity(e.target.value)}
+                      aria-label="Store city or area"
+                    />
+                  </div>
+                ) : null}
+              </div>
+
               <label className="text-sm font-medium text-muted-foreground" htmlFor="log-price">
-                {logging === "receipt" ? "Price paid (₱)" : "Current price at SM (₱)"}
+                {logging === "receipt" ? "Price paid (₱)" : "Current price at the store (₱)"}
               </label>
               <Input
                 id="log-price"
@@ -161,24 +238,21 @@ export function PriceDetailSheet({ open, onOpenChange, item, storeName, city, on
                 <Button variant="ghost" className="flex-1" onClick={() => setLogging(null)}>
                   Cancel
                 </Button>
-                <Button className="flex-1" onClick={handleSave}>
+                <Button className="flex-1" onClick={handleSave} disabled={!canSave}>
                   Save
                 </Button>
               </div>
             </div>
           ) : (
             <div className="flex gap-2">
-              <Button variant="secondary" className="flex-1" onClick={() => setLogging("receipt")} disabled={!storeName}>
+              <Button variant="secondary" className="flex-1" onClick={() => setLogging("receipt")}>
                 Log receipt price
               </Button>
-              <Button variant="secondary" className="flex-1" onClick={() => setLogging("user-verified-sm")} disabled={!storeName}>
-                Verify at SM
+              <Button variant="secondary" className="flex-1" onClick={() => setLogging("user-verified")}>
+                Verify current price
               </Button>
             </div>
           )}
-          {!storeName ? (
-            <p className="text-center text-xs text-muted-foreground">Select an SM store in Profile to log a price.</p>
-          ) : null}
         </div>
       </SheetContent>
     </Sheet>

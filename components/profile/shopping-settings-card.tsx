@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LocateFixed, MapPin, Minus, Plus, Search } from "lucide-react";
+import { Check, LocateFixed, MapPin, Minus, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getCurrentPosition } from "@/lib/geolocation";
@@ -13,11 +13,12 @@ import { cn } from "@/lib/utils";
 interface ShoppingSettingsCardProps {
   settings: ShoppingSettings;
   onChange: (patch: Partial<ShoppingSettings>) => void;
-  onSetStore: (storeName: string, storeCity: string, storeAddress?: string) => void;
+  onAddStore: (storeName: string, storeCity: string, storeAddress?: string) => void;
+  onSetCurrentStore: (storeId: string) => void;
 }
 
 const PRICING_MODES: { value: PricingMode; label: string; hint: string }[] = [
-  { value: "normal", label: "Normal estimate", hint: "Typical SM shelf prices" },
+  { value: "normal", label: "Normal estimate", hint: "Typical shelf prices" },
   { value: "conservative", label: "Conservative", hint: "Rounds up for price swings" },
 ];
 
@@ -25,18 +26,23 @@ function formatDistance(meters: number): string {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km away` : `${Math.round(meters)} m away`;
 }
 
-/** Exact SM store, weekly budget, pricing mode, and household size — feeds the Grocery screen's pricing. Store is required before any pricing is shown; "SM Markets" alone is never treated as a price location. */
-export function ShoppingSettingsCard({ settings, onChange, onSetStore }: ShoppingSettingsCardProps) {
+/**
+ * Every store the user shops at, weekly budget, pricing mode, and household
+ * size — feeds the Grocery screen's pricing. You can log a price at any
+ * store you name (not just SM); the "current" store just decides which
+ * store's prices show on the Grocery total by default.
+ */
+export function ShoppingSettingsCard({ settings, onChange, onAddStore, onSetCurrentStore }: ShoppingSettingsCardProps) {
   const [locRegion, setLocRegion] = useState(settings.region ?? "");
   const [locProvince, setLocProvince] = useState(settings.province ?? "");
   const [locCity, setLocCity] = useState(settings.city ?? "");
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
-  const [editingStore, setEditingStore] = useState(!settings.store);
-  const [name, setName] = useState(settings.store?.storeName ?? "");
-  const [storeCity, setStoreCity] = useState(settings.store?.storeCity ?? "");
-  const [address, setAddress] = useState(settings.store?.storeAddress ?? "");
+  const [addingStore, setAddingStore] = useState(settings.stores.length === 0);
+  const [name, setName] = useState("");
+  const [storeCity, setStoreCity] = useState(locCity);
+  const [address, setAddress] = useState("");
   const [findingStores, setFindingStores] = useState(false);
   const [storeSearchError, setStoreSearchError] = useState<string | null>(null);
   const [nearbyStores, setNearbyStores] = useState<NearbySmStore[] | null>(null);
@@ -45,8 +51,12 @@ export function ShoppingSettingsCard({ settings, onChange, onSetStore }: Shoppin
 
   const handleSaveStore = () => {
     if (!canSaveStore) return;
-    onSetStore(name, storeCity, address);
-    setEditingStore(false);
+    onAddStore(name, storeCity, address);
+    setName("");
+    setStoreCity(locCity);
+    setAddress("");
+    setNearbyStores(null);
+    setAddingStore(false);
   };
 
   const handleUseMyLocation = async () => {
@@ -95,10 +105,9 @@ export function ShoppingSettingsCard({ settings, onChange, onSetStore }: Shoppin
 
   const handlePickNearbyStore = (store: NearbySmStore) => {
     setName(store.name);
-    setStoreCity(locCity || settings.store?.storeCity || "");
+    setStoreCity(locCity || storeCity);
     setAddress(store.address ?? "");
     setNearbyStores(null);
-    setEditingStore(true);
   };
 
   return (
@@ -148,32 +157,54 @@ export function ShoppingSettingsCard({ settings, onChange, onSetStore }: Shoppin
       </div>
 
       <div>
-        <p className="mb-1.5 text-sm font-medium text-muted-foreground">SM store</p>
-        {!editingStore && settings.store ? (
-          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
-              <MapPin className="size-4.5" aria-hidden />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{settings.store.storeName}</p>
-              <p className="truncate text-sm text-muted-foreground">
-                {settings.store.storeCity}
-                {settings.store.storeAddress ? ` · ${settings.store.storeAddress}` : ""}
-              </p>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setEditingStore(true)}>
-              Change
-            </Button>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
-            {!settings.store ? (
-              <p className="text-sm text-muted-foreground">
-                Pricing needs your exact branch — "SM Markets" alone isn't specific enough. Find it below or enter
-                the store you actually shop at.
-              </p>
-            ) : null}
+        <p className="mb-1.5 text-sm font-medium text-muted-foreground">Your stores</p>
+        {settings.stores.length === 0 && !addingStore ? null : (
+          <p className="mb-2 text-xs text-muted-foreground">
+            Add every store you actually shop at — any supermarket, not just SM. Prices you log stay scoped to the
+            exact store you name; tap a store below to make it the one shown on your grocery total.
+          </p>
+        )}
 
+        {settings.stores.length > 0 ? (
+          <ul className="mb-3 flex flex-col divide-y divide-border/60 overflow-hidden rounded-2xl border border-border">
+            {settings.stores.map((store) => {
+              const isCurrent = store.storeId === settings.currentStoreId;
+              return (
+                <li key={store.storeId}>
+                  <button
+                    type="button"
+                    onClick={() => onSetCurrentStore(store.storeId)}
+                    aria-pressed={isCurrent}
+                    className={cn(
+                      "flex w-full items-center gap-3 px-4 py-3 text-left outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring active:bg-muted",
+                      isCurrent && "bg-accent/40",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex size-9 shrink-0 items-center justify-center rounded-xl",
+                        isCurrent ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {isCurrent ? <Check className="size-4.5" aria-hidden /> : <MapPin className="size-4.5" aria-hidden />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{store.storeName}</span>
+                      <span className="block truncate text-sm text-muted-foreground">
+                        {store.storeCity}
+                        {store.storeAddress ? ` · ${store.storeAddress}` : ""}
+                      </span>
+                    </span>
+                    {isCurrent ? <span className="shrink-0 text-xs font-medium text-accent-foreground">Shopping here</span> : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+
+        {addingStore ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
             <Button
               type="button"
               variant="outline"
@@ -209,31 +240,31 @@ export function ShoppingSettingsCard({ settings, onChange, onSetStore }: Shoppin
               </ul>
             ) : null}
             <p className="text-[11px] text-muted-foreground/70">
-              Store search powered by OpenStreetMap community data — coverage isn't guaranteed complete; confirm
-              below before saving.
+              Store search powered by OpenStreetMap community data, and only finds SM branches — coverage isn't
+              guaranteed complete. Shopping somewhere else? Just type it in below.
             </p>
 
             <Input
-              placeholder="Store name, e.g. SM Supermarket Fairview"
+              placeholder="Store name, e.g. Puregold Imus or SM Supermarket Fairview"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              aria-label="SM store name"
+              aria-label="Store name"
             />
             <Input
               placeholder="City / area, e.g. Quezon City"
               value={storeCity}
               onChange={(e) => setStoreCity(e.target.value)}
-              aria-label="SM store city or area"
+              aria-label="Store city or area"
             />
             <Input
               placeholder="Address (optional)"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              aria-label="SM store address"
+              aria-label="Store address"
             />
             <div className="flex gap-2">
-              {settings.store ? (
-                <Button variant="ghost" className="flex-1" onClick={() => setEditingStore(false)}>
+              {settings.stores.length > 0 ? (
+                <Button variant="ghost" className="flex-1" onClick={() => setAddingStore(false)}>
                   Cancel
                 </Button>
               ) : null}
@@ -242,6 +273,11 @@ export function ShoppingSettingsCard({ settings, onChange, onSetStore }: Shoppin
               </Button>
             </div>
           </div>
+        ) : (
+          <Button type="button" variant="outline" size="sm" onClick={() => setAddingStore(true)} className="w-fit">
+            <Plus className="size-4" aria-hidden />
+            Add a store
+          </Button>
         )}
       </div>
 
