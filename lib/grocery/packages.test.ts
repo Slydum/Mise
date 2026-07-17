@@ -230,6 +230,83 @@ describe("buildGroceryItems", () => {
     expect(item.priceInfo).toBeUndefined();
   });
 
+  it("explains why the price is unavailable when only a per-kg rate was logged for a piece-counted item", () => {
+    const candidates = [
+      commodityPrice({ canonicalIngredientKey: "avocado", source: "receipt", storeId: "puregold-imus", isWeighted: true, pricePerKgPhp: 69 }),
+    ];
+    const [item] = buildGroceryItems(
+      [usageLine({ canonicalKey: "avocado", displayName: "Avocado", amount: 4, baseUnit: "piece" })],
+      "puregold-imus",
+      candidates,
+    );
+    expect(item.priceInfo).toBeUndefined();
+    expect(item.priceUnavailableReason).toMatch(/per-kilogram\/per-liter price was logged/);
+  });
+
+  it("falls back to a usable whole-purchase price when the top-ranked match is a per-kg rate that can't convert", () => {
+    // Both logged for the same ingredient/store: a per-kg rate (ranks first, same tier,
+    // but can't price a piece-counted line) and a whole-purchase price (usable). The
+    // line must still get priced from the usable one instead of going unpriced.
+    const candidates = [
+      commodityPrice({
+        id: "per-kg",
+        canonicalIngredientKey: "avocado",
+        source: "receipt",
+        storeId: "puregold-imus",
+        isWeighted: true,
+        pricePerKgPhp: 69,
+        referencePeriod: "2026-07",
+      }),
+      packageCommodityPrice({
+        id: "whole",
+        canonicalIngredientKey: "avocado",
+        source: "receipt",
+        storeId: "puregold-imus",
+        amount: 1,
+        unit: "piece",
+        pricePhp: 31,
+        referencePeriod: "2026-07",
+      }),
+    ];
+    const [item] = buildGroceryItems(
+      [usageLine({ canonicalKey: "avocado", displayName: "Avocado", amount: 4, baseUnit: "piece" })],
+      "puregold-imus",
+      candidates,
+    );
+    expect(item.priceInfo?.isUsageReference).toBe(false);
+    expect(item.priceInfo?.price.id).toBe("whole");
+  });
+
+  it("explains why the price is unavailable when a price was logged for a different package size", () => {
+    const candidates = [
+      packageCommodityPrice({
+        canonicalIngredientKey: "canned tuna",
+        source: "receipt",
+        storeId: "sm-fairview",
+        amount: 2,
+        unit: "can",
+        pricePhp: 70,
+      }),
+    ];
+    const [item] = buildGroceryItems(
+      [usageLine({ canonicalKey: "canned tuna", displayName: "Canned tuna", amount: 1, baseUnit: "can" })],
+      "sm-fairview",
+      candidates,
+    );
+    expect(item.priceInfo).toBeUndefined();
+    expect(item.priceUnavailableReason).toMatch(/not for this exact package/);
+  });
+
+  it("sets no reason at all when nothing was ever logged for this ingredient", () => {
+    const [item] = buildGroceryItems(
+      [usageLine({ canonicalKey: "dragonfruit", displayName: "Dragonfruit", amount: 1, baseUnit: "piece" })],
+      "sm-fairview",
+      [],
+    );
+    expect(item.priceInfo).toBeUndefined();
+    expect(item.priceUnavailableReason).toBeUndefined();
+  });
+
   it("scales quantities by the servings ratio before purchase selection", () => {
     const chickenThighs: Ingredient = {
       id: "ct",

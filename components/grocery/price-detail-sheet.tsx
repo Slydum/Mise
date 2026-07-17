@@ -206,7 +206,11 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
                 ) : null}
               </>
             ) : (
-              <Row label="Price" value="Price unavailable" hint="No PSA, DTI, or logged price is available for this item yet." />
+              <Row
+                label="Price"
+                value="Price unavailable"
+                hint={item.priceUnavailableReason ?? "No PSA, DTI, or logged price is available for this item yet."}
+              />
             )}
           </dl>
 

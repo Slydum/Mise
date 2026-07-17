@@ -2,7 +2,7 @@ import { getCatalogEntry } from "@/lib/grocery/ingredient-catalog";
 import type { PackageForm, RetailPackage } from "@/lib/grocery/sm-packages";
 import { toBaseAmount, unitKindOf } from "@/lib/grocery/units";
 import type { UsageLine } from "@/lib/grocery/aggregate";
-import { resolvePrice, type PriceMatchContext } from "@/lib/pricing/priority";
+import { resolvePriceCandidates, type PriceMatchContext } from "@/lib/pricing/priority";
 import type { CommodityPrice } from "@/lib/pricing/types";
 import type { GroceryItem, GroceryItemPriceInfo } from "@/lib/types";
 
@@ -90,9 +90,15 @@ function toKgOrLiter(amount: number, baseUnit: string): { amount: number; kind: 
   return undefined;
 }
 
+interface PriceResolution {
+  priceInfo?: GroceryItemPriceInfo;
+  /** Set only when nothing usable resolved but a logged price for this ingredient at this store exists — see GroceryItem.priceUnavailableReason. */
+  unavailableReason?: string;
+}
+
 /**
- * Turns a resolved CommodityPrice into the cost figure for this grocery
- * line, per GROCERY CALCULATIONS:
+ * Turns the ranked candidates into the cost figure for this grocery line,
+ * per GROCERY CALCULATIONS:
  *   - Weighted prices (PSA references, or a receipt/verified per-kg rate
  *     for produce sold by weight — see CommodityPrice.isWeighted):
  *     usageCost = requiredWeightInKg * pricePerKg (or per liter) — an
@@ -103,32 +109,60 @@ function toKgOrLiter(amount: number, baseUnit: string): { amount: number; kind: 
  *   - Package-priced sources (receipt, user-verified, dti-epresyo):
  *     checkout cost = packageCount * packagePricePhp — an exact, real
  *     cost for the specific package bought.
+ *
+ * A candidate matching the context isn't automatically usable — a weighted
+ * rate can match (weighted matching ignores package/amount) and still fail
+ * to convert for a piece-counted line. Rather than the whole line going
+ * unpriced because the #1-ranked candidate happened to be that kind, this
+ * walks the ranked list until one actually produces a valid cost.
  */
 function computePriceInfo(
   line: UsageLine,
   purchase: PurchaseSelection,
   storeId: string | null,
   candidates: CommodityPrice[],
-): GroceryItemPriceInfo | undefined {
+): PriceResolution {
   const context: PriceMatchContext = {
     canonicalIngredientKey: line.canonicalKey,
     packageAmount: purchase.packageAmount,
     packageUnit: purchase.packageUnit,
     storeId: storeId ?? undefined,
   };
-  const resolved = resolvePrice(context, candidates);
-  if (!resolved) return undefined;
+  const ranked = resolvePriceCandidates(context, candidates);
 
-  if (resolved.isWeighted) {
-    const converted = toKgOrLiter(line.amount, line.baseUnit);
-    if (!converted) return undefined;
-    const perUnitPrice = converted.kind === "kg" ? resolved.pricePerKgPhp : resolved.pricePerLiterPhp;
-    if (perUnitPrice === undefined) return undefined;
-    return { price: resolved, lineTotalPhp: converted.amount * perUnitPrice, isUsageReference: true };
+  for (const resolved of ranked) {
+    if (resolved.isWeighted) {
+      const converted = toKgOrLiter(line.amount, line.baseUnit);
+      if (!converted) continue;
+      const perUnitPrice = converted.kind === "kg" ? resolved.pricePerKgPhp : resolved.pricePerLiterPhp;
+      if (perUnitPrice === undefined) continue;
+      return { priceInfo: { price: resolved, lineTotalPhp: converted.amount * perUnitPrice, isUsageReference: true } };
+    }
+    const packageCount = purchase.packageCount ?? 1;
+    return {
+      priceInfo: { price: resolved, packageCount, lineTotalPhp: packageCount * resolved.pricePhp, isUsageReference: false },
+    };
   }
 
-  const packageCount = purchase.packageCount ?? 1;
-  return { price: resolved, packageCount, lineTotalPhp: packageCount * resolved.pricePhp, isUsageReference: false };
+  // Nothing usable matched this exact line. If the user logged *something*
+  // for this ingredient at this store, say so specifically instead of the
+  // generic "no price available" — that phrasing reads as if nothing was
+  // ever logged, when really it just doesn't fit this line's shape yet.
+  const loggedForThisIngredient = candidates.filter(
+    (p) =>
+      p.canonicalIngredientKey === line.canonicalKey &&
+      (p.source === "receipt" || p.source === "user-verified") &&
+      (!p.storeId || p.storeId === storeId),
+  );
+  if (loggedForThisIngredient.length > 0) {
+    const onlyWeighted = loggedForThisIngredient.every((p) => p.isWeighted);
+    const unavailableReason = onlyWeighted
+      ? "A per-kilogram/per-liter price was logged for this ingredient, but this item isn't measured by weight here — log a price for the package instead."
+      : "A price was logged for this ingredient at this store, but not for this exact package — log one for this package to use it here.";
+    return { unavailableReason };
+  }
+
+  return {};
 }
 
 /**
@@ -139,8 +173,10 @@ function computePriceInfo(
  * (PSA OpenSTAT, PSA Price Situationer, DTI e-Presyo, the user's own SM
  * verifications/receipts — see lib/pricing/), already gathered by the
  * caller. This function never fetches and never fabricates: an item with
- * no matching candidate simply has no `priceInfo`, which the UI renders as
- * "Price unavailable."
+ * no usable candidate simply has no `priceInfo`, which the UI renders as
+ * "Price unavailable" — with `priceUnavailableReason` set when a logged
+ * price for this ingredient exists but doesn't fit this line (see
+ * computePriceInfo).
  */
 export function buildGroceryItems(
   usageLines: UsageLine[],
@@ -150,7 +186,7 @@ export function buildGroceryItems(
   return usageLines.map((line) => {
     const purchase = selectPurchase(line.canonicalKey, line.amount, line.baseUnit);
     const id = `gen-${line.canonicalKey}-${line.baseUnit}`.replace(/\s+/g, "-");
-    const priceInfo = computePriceInfo(line, purchase, storeId, priceCandidates);
+    const { priceInfo, unavailableReason } = computePriceInfo(line, purchase, storeId, priceCandidates);
 
     const shared = {
       id,
@@ -160,6 +196,7 @@ export function buildGroceryItems(
       usageAmount: line.amount,
       usageUnit: line.baseUnit,
       ...(priceInfo ? { priceInfo } : {}),
+      ...(unavailableReason ? { priceUnavailableReason: unavailableReason } : {}),
     };
 
     if (purchase.packageForm && purchase.packageCount) {

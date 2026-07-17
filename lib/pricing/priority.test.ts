@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolvePrice, type PriceMatchContext } from "@/lib/pricing/priority";
+import { resolvePrice, resolvePriceCandidates, type PriceMatchContext } from "@/lib/pricing/priority";
 import type { CommodityPrice } from "@/lib/pricing/types";
 
 function price(overrides: Partial<CommodityPrice>): CommodityPrice {
@@ -134,5 +134,21 @@ describe("resolvePrice", () => {
   it("a per-kg receipt rate still respects store scoping", () => {
     const candidates = [packagePrice({ source: "receipt", storeId: "sm-north-edsa", isWeighted: true, pricePerKgPhp: 69 })];
     expect(resolvePrice(context, candidates)).toBeUndefined();
+  });
+});
+
+describe("resolvePriceCandidates", () => {
+  it("returns every matching candidate, ranked, not just the top one — callers can fall back if the #1 match turns out unusable", () => {
+    const candidates = [
+      packagePrice({ id: "per-kg", source: "receipt", storeId: "sm-fairview", isWeighted: true, pricePerKgPhp: 69, referencePeriod: "2026-07" }),
+      packagePrice({ id: "whole", source: "receipt", storeId: "sm-fairview", amount: 1, unit: "kg", pricePhp: 90, referencePeriod: "2026-07" }),
+      packagePrice({ id: "dti", source: "dti-epresyo", amount: 1, unit: "kg" }),
+    ];
+    const ranked = resolvePriceCandidates(context, candidates);
+    expect(ranked.map((p) => p.id)).toEqual(["per-kg", "whole", "dti"]);
+  });
+
+  it("returns an empty array, never undefined, when nothing matches", () => {
+    expect(resolvePriceCandidates(context, [])).toEqual([]);
   });
 });

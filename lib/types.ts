@@ -221,6 +221,14 @@ export interface GroceryItem {
   packageUnit?: string;
   /** Absent means "Price unavailable" — see GroceryItemPriceInfo above. */
   priceInfo?: GroceryItemPriceInfo;
+  /**
+   * Set only when priceInfo is absent *and* a receipt/verified price does
+   * exist for this ingredient at the current store but couldn't price this
+   * exact line (e.g. a per-kg rate logged for a piece-counted item, or a
+   * price logged for a different package size) — explains an otherwise
+   * mysterious "Price unavailable" after the user just logged something.
+   */
+  priceUnavailableReason?: string;
 }
 
 /** An ingredient the user already has on hand that's nearing its use-by point. */

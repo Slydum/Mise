@@ -57,8 +57,12 @@ export function GroceryScreen() {
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<GroceryItem | null>(null);
   const [pantryOpen, setPantryOpen] = useState(false);
-  const [priceDetailItem, setPriceDetailItem] = useState<GroceryItem | null>(null);
+  const [priceDetailItemId, setPriceDetailItemId] = useState<string | null>(null);
   const [receiptScanOpen, setReceiptScanOpen] = useState(false);
+  // Derived (not a snapshot) so the sheet reflects the latest price the moment
+  // grocery.items refreshes after a log — otherwise it'd keep showing
+  // pre-save data ("still unavailable") until closed and reopened.
+  const priceDetailItem = priceDetailItemId ? (grocery.items.find((i) => i.id === priceDetailItemId) ?? null) : null;
 
   const sections = useMemo(() => {
     const byCategory = new Map<GroceryCategory, GroceryItem[]>();
@@ -289,7 +293,7 @@ export function GroceryScreen() {
                               />
                               <button
                                 type="button"
-                                onClick={() => setPriceDetailItem(item)}
+                                onClick={() => setPriceDetailItemId(item.id)}
                                 className="flex min-w-0 flex-1 items-center gap-3.5 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 aria-label={`View price details for ${item.name}`}
                               >
@@ -380,7 +384,7 @@ export function GroceryScreen() {
       <PriceDetailSheet
         open={priceDetailItem !== null}
         onOpenChange={(open) => {
-          if (!open) setPriceDetailItem(null);
+          if (!open) setPriceDetailItemId(null);
         }}
         item={priceDetailItem}
         stores={shoppingSettings.stores}

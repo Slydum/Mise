@@ -68,15 +68,20 @@ function psaTieBreak(a: CommodityPrice, b: CommodityPrice): number {
 }
 
 /**
- * Resolves the single price to use for a grocery item, per the 8-tier
- * priority (receipt > user-verified > DTI > PSA city > province > region
- * > national > unavailable). Never lets one package size's price stand in
- * for another, and never promotes a PSA/DTI commodity reference to
- * `isExactStorePrice`.
+ * Ranks every price matching the context, per the 8-tier priority (receipt
+ * > user-verified > DTI > PSA city > province > region > national). Never
+ * lets one package size's price stand in for another, and never promotes a
+ * PSA/DTI commodity reference to `isExactStorePrice`.
+ *
+ * Returns the full ranked list rather than just the top match: a weighted
+ * (per-kg/per-liter) price can match this context yet still turn out
+ * unusable downstream (see lib/grocery/packages.ts) if the item's usage
+ * isn't itself weight-based — the caller needs to be able to fall back to
+ * the next-best candidate instead of the whole line going unpriced just
+ * because the #1 match couldn't be applied.
  */
-export function resolvePrice(context: PriceMatchContext, candidates: CommodityPrice[]): CommodityPrice | undefined {
+export function resolvePriceCandidates(context: PriceMatchContext, candidates: CommodityPrice[]): CommodityPrice[] {
   const applicable = candidates.filter((p) => matchesRequiredContext(p, context));
-  if (applicable.length === 0) return undefined;
 
   return applicable.slice().sort((a, b) => {
     const tierDiff = tierOf(a) - tierOf(b);
@@ -88,5 +93,10 @@ export function resolvePrice(context: PriceMatchContext, candidates: CommodityPr
       return psaTieBreak(a, b);
     }
     return b.referencePeriod.localeCompare(a.referencePeriod);
-  })[0];
+  });
+}
+
+/** The single best-ranked price, per resolvePriceCandidates — convenience for callers that can't use a fallback. */
+export function resolvePrice(context: PriceMatchContext, candidates: CommodityPrice[]): CommodityPrice | undefined {
+  return resolvePriceCandidates(context, candidates)[0];
 }
