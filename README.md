@@ -148,6 +148,18 @@ Key distinctions the app enforces everywhere:
   search in a new tab for the user to read themselves — Mise never reads,
   parses, or trusts search results as a price; it's purely a research aid
   before the user manually logs a number.
+- **"Scan a receipt"** runs on-device OCR (Tesseract.js, `lib/ocr/receipt-
+  ocr.ts`) on a photo and surfaces every price-shaped number it finds as a
+  tappable chip — it never auto-fills or auto-saves a price. Like the
+  location features below, this is genuinely functional in the deployed
+  app (it needs no server), but it does need real internet access the
+  first time it runs, since Tesseract.js fetches its language data from a
+  CDN — cached in the browser afterward. Not verified end-to-end from this
+  coding session for the same network-access reason as everywhere else in
+  this doc; verified instead is the pure candidate-extraction logic
+  (`lib/ocr/receipt-ocr.test.ts`) and that a failed OCR read degrades
+  gracefully to manual entry rather than getting stuck or crashing the
+  sheet.
 
 ### What a real integration would need
 

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { Search } from "lucide-react";
+import { useRef, useState } from "react";
+import { Camera, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { formatApproxPhp, formatPhp } from "@/lib/grocery/currency";
 import { formatQuantity } from "@/lib/ingredients";
 import { geographicLevelLabel, geographicLevelOf } from "@/lib/pricing/geographic";
+import { runReceiptOcr, type OcrCandidatePrice } from "@/lib/ocr/receipt-ocr";
 import type { PurchaseRecord } from "@/lib/grocery/purchase-history";
 import type { GroceryItem, ShoppingStore } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,16 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(currentStoreId ?? stores[0]?.storeId ?? NEW_STORE);
   const [newStoreName, setNewStoreName] = useState("");
   const [newStoreCity, setNewStoreCity] = useState(city ?? "");
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [ocrCandidates, setOcrCandidates] = useState<OcrCandidatePrice[] | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const resetScan = () => {
+    setScanning(false);
+    setScanError(null);
+    setOcrCandidates(null);
+  };
 
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
@@ -68,6 +79,7 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
       setSelectedStoreId(currentStoreId ?? stores[0]?.storeId ?? NEW_STORE);
       setNewStoreName("");
       setNewStoreCity(city ?? "");
+      resetScan();
     }
   }
 
@@ -106,9 +118,33 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
     onLogPrice(parsed, logging, store);
     setLogging(null);
     setDraftPrice("");
+    resetScan();
   };
 
   const searchQuery = `how much is ${item.name.toLowerCase()}${city ? ` in ${city}` : " in the Philippines"}`;
+
+  const handleScanReceipt = () => fileInputRef.current?.click();
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setScanning(true);
+    setScanError(null);
+    setOcrCandidates(null);
+    try {
+      const result = await runReceiptOcr(file);
+      if (result.candidates.length === 0) {
+        setScanError("Couldn't find a price on that photo — enter it manually below.");
+      } else {
+        setOcrCandidates(result.candidates);
+      }
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : "Couldn't read that photo — enter the price manually.");
+    } finally {
+      setScanning(false);
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -223,6 +259,46 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
                 ) : null}
               </div>
 
+              <div className="flex flex-col gap-1.5">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleFileSelected}
+                  aria-label="Photo of receipt"
+                />
+                <Button type="button" variant="outline" size="sm" onClick={handleScanReceipt} disabled={scanning} className="w-fit">
+                  <Camera className="size-4" aria-hidden />
+                  {scanning ? "Reading photo…" : "Scan a receipt"}
+                </Button>
+                {scanError ? <p className="text-xs text-destructive">{scanError}</p> : null}
+                {ocrCandidates ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {ocrCandidates.map((c, i) => (
+                      <button
+                        key={`${c.value}-${i}`}
+                        type="button"
+                        onClick={() => setDraftPrice(String(c.value))}
+                        title={c.context}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          draftPrice === String(c.value) ? "border-primary bg-primary/10" : "border-border/60 text-muted-foreground",
+                        )}
+                      >
+                        {formatPhp(c.value)}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {ocrCandidates ? (
+                  <p className="text-[11px] text-muted-foreground/70">
+                    Read from your photo on this device — tap the right one, or edit it below. Never saved without your confirmation.
+                  </p>
+                ) : null}
+              </div>
+
               <label className="text-sm font-medium text-muted-foreground" htmlFor="log-price">
                 {logging === "receipt" ? "Price paid (₱)" : "Current price at the store (₱)"}
               </label>
@@ -235,7 +311,14 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
                 aria-label="Price in pesos"
               />
               <div className="flex gap-2">
-                <Button variant="ghost" className="flex-1" onClick={() => setLogging(null)}>
+                <Button
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={() => {
+                    setLogging(null);
+                    resetScan();
+                  }}
+                >
                   Cancel
                 </Button>
                 <Button className="flex-1" onClick={handleSave} disabled={!canSave}>
