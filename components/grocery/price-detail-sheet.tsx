@@ -383,6 +383,11 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
                 onChange={(e) => setDraftPrice(e.target.value)}
                 aria-label="Price in pesos"
               />
+              {!canSave && draftPrice.trim().length > 0 && isNewStore ? (
+                <p className="text-center text-xs text-destructive">
+                  Enter the new store's name and city above to save.
+                </p>
+              ) : null}
               <div className="flex gap-2">
                 <Button
                   variant="ghost"

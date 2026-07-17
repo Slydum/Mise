@@ -332,6 +332,14 @@ export function ReceiptScanSheet({ open, onOpenChange, items, stores, currentSto
             </div>
           ) : null}
 
+          {!canSave ? (
+            <p className="text-center text-xs text-destructive">
+              {assignedCount === 0
+                ? "Assign at least one price above to save."
+                : "Enter the new store's name and city above (in the \"Which store?\" section) to save."}
+            </p>
+          ) : null}
+
           <div className="flex gap-2">
             <Button variant="ghost" className="flex-1" onClick={() => onOpenChange(false)}>
               Cancel
