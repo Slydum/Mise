@@ -62,6 +62,16 @@ const PANTRY_STAPLES = new Set([
   "powdered milk",
   "pasta",
   "garlic",
+  "fish sauce",
+  "vinegar",
+  "shrimp paste",
+  "bay leaf",
+  "peppercorn",
+  "sinigang mix",
+  "mung bean",
+  "flour",
+  "rice noodle",
+  "chicken stock",
 ]);
 
 export function getCatalogEntry(canonicalKey: string): IngredientCatalogEntry {
