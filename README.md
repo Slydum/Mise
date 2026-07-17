@@ -75,64 +75,89 @@ To reproduce the Pages build locally:
 STATIC_EXPORT=1 NEXT_PUBLIC_BASE_PATH=/Mise npm run build   # outputs ./out
 ```
 
-## Grocery pricing (SM Markets)
+## Grocery pricing (PSA / DTI / SM)
 
 The Grocery screen shows package sizes and quantities for every ingredient,
-but **there is no live SM Markets Online pricing in this app.** This is a
-deliberate, honest state, not a missing feature waiting on API keys:
+and prices them against a unified official-data model in `lib/pricing/` —
+but **there is no live connection to PSA, DTI, or SM Markets Online in this
+app.** This is a deliberate, honest state, not a missing feature waiting on
+API keys. It was verified directly, not assumed: this session's outbound web
+access is blocked at the environment/proxy level for every external host
+tried, including `openstat.psa.gov.ph`, `dti.gov.ph`, and
+`shop.smmarkets.ph` — confirmed against a neutral control host too, so it's
+an environment constraint, not something specific to any of these sites.
 
-- SM Markets Online (`shop.smmarkets.ph`) publishes no public product/price
-  API or developer program.
-- This deployment is a static export on GitHub Pages, which has no server
-  runtime — even a real data source couldn't be fetched per-request from
-  here (see "Moving to a live server" below).
-- A prior version of this app shipped a hand-curated table of *plausible*
-  SM prices. That table has been removed from production entirely — it was
-  never live data, and presenting it as "the SM total" was misleading. It
-  survives only as fixtures inside test files (`lib/grocery/*.test.ts`),
-  which is where estimated numbers belong.
+The pricing model (`lib/pricing/types.ts`'s `CommodityPrice`) unifies five
+sources, in priority order:
 
-What the app does instead:
+1. **Receipt** — what you logged after actually buying something
+2. **User-verified SM** — a price you manually confirmed is currently
+   accurate at your branch, without necessarily buying
+3. **DTI e-Presyo** — monitored basic-necessity/prime-commodity prices
+4. **PSA Price Situationer** / **PSA OpenSTAT** — official market
+   references, always the most locally-specific figure available (city →
+   province → region → national, each labeled as such —
+   `lib/pricing/geographic.ts`)
 
-- **Every `GroceryItem.livePriceStatus` is always `"unavailable"`.** Nothing
-  in production ever fabricates a peso amount or shows ₱0 for a missing
-  price. `lib/sm/adapter.ts` is the seam a real integration would plug into
-  — every function in it returns `integration-unavailable` today.
-- **Package math still works.** `lib/grocery/sm-packages.ts` keeps package
-  *shapes* (e.g. "eggs are sold by the tray of 30") — that's a fact about
-  retail packaging, not a price — so the app can still tell you "buy 1
-  tray," it just can't tell you what that tray costs.
-- **Purchase history, not price.** You can log what you actually paid after
-  a shopping trip (`lib/grocery/purchase-history.ts`); it's shown as "Last
-  paid ₱X on [date]," scoped to your selected store, and is never summed
-  into a "current" basket total.
-- **An exact store is required.** "SM Markets" alone isn't a price
-  location — Profile → Shopping requires a specific branch (name + city,
-  typed in — there's no live SM store directory to pick from either)
-  before any pricing UI activates.
+Only sources 1–2 have real data today, because they're the user's own
+locally-stored input (`lib/grocery/purchase-history.ts`) — no network
+access needed. Sources 3–4 are fully built (matching, geographic fallback,
+freshness rules, per-kilogram calculations — all unit-tested in
+`lib/pricing/*.test.ts`) but their adapters
+(`lib/pricing/adapters/{psa-openstat,psa-situationer,dti-epresyo}.ts`)
+honestly return `integration-unavailable` since there's nothing to fetch
+from. Nothing in production ever fabricates a peso amount or shows ₱0 for a
+missing price — a grocery row with no resolved price shows "Price
+unavailable."
+
+Key distinctions the app enforces everywhere:
+
+- **A PSA/DTI reference is never labeled as an exact SM price.**
+  `CommodityPrice.isExactStorePrice` is only ever `true` for a receipt or a
+  user verification; PSA/DTI figures are commodity-level market references
+  (`GroceryItem.priceInfo.isUsageReference`), not a checkout guarantee.
+- **Materially different commodities are never merged.** Native vs.
+  imported garlic, red vs. white onion, well-milled vs. regular-milled
+  rice, fresh vs. canned tuna, salmon vs. tilapia all stay distinct in
+  `lib/pricing/commodities.ts`'s mapping table — a missing mapping is
+  `commodityName: null`, never a plausible-looking substitute.
+- **An exact store is required for SM-specific pricing.** "SM Markets"
+  alone isn't a price location — Profile → Shopping requires a specific
+  branch (name + city, typed in — there's no live SM store directory to
+  pick from either).
+- **"Search prices online"** in the price-detail sheet opens a plain Google
+  search in a new tab for the user to read themselves — Mise never reads,
+  parses, or trusts search results as a price; it's purely a research aid
+  before the user manually logs a number.
 
 ### What a real integration would need
 
 1. **A server runtime.** Route Handlers under `app/api/` need a Node
    environment to run per-request — GitHub Pages' static export can't host
    them. Moving to Vercel (or any Node host) removes the `output: "export"`
-   constraint in `next.config.ts` (see `STATIC_EXPORT` there) and lets
-   `lib/sm/adapter.ts` actually make server-side requests, keeping any
-   credentials out of the browser bundle.
-2. **A real data source**, one of:
-   - An official SM Markets API or partner/affiliate data feed, or
-   - A manually-verified, rate-limited storefront integration built by
-     directly inspecting `shop.smmarkets.ph` in a real browser — this
-     needs a human to confirm what's actually publicly accessible without
-     defeating login, CAPTCHA, or anti-bot controls, since that can't be
-     done or verified from an automated sandbox. (This session's outbound
-     web access is itself blocked at the environment level, independent of
-     SM's own bot-detection posture — see the agent proxy's `403` policy.)
-3. Wire the result into `lib/sm/adapter.ts` in place of the
-   `integration-unavailable` stubs — `GroceryItem.livePriceStatus`,
-   `liveTotalPricePhp`, `lib/grocery/basket.ts`, and the Grocery UI are
-   already built to consume real freshness/status data the moment it
-   exists; no call site should need to change.
+   constraint in `next.config.ts` (see `STATIC_EXPORT` there) and lets the
+   adapters actually make server-side requests, keeping any credentials out
+   of the browser bundle.
+2. **Real data sources**, per adapter:
+   - PSA OpenSTAT/Price Situationer: PSA publishes retail-price tables and
+     periodic releases; a real adapter needs whatever structured access PSA
+     offers (bulk download, OpenSTAT query API, or a properly-authorized
+     scraper someone builds after directly inspecting the site in a real
+     browser — not assumed or guessed here).
+   - DTI e-Presyo: same approach — consume structured data if DTI exposes
+     it, otherwise an isolated parser for official downloadable
+     files/pages, never bypassing auth/CAPTCHA/anti-bot controls.
+   - SM Markets: an official API/partner feed, since SM publishes no public
+     one.
+3. **Supabase**, for server-persisted price history and a scheduled refresh
+   job (daily PSA/DTI ingestion, rate-limited per user/store) — not
+   connected in this build; see the Supabase section below. Until then,
+   everything stays local-first via `lib/data/local-store.ts`.
+4. Wire results into the relevant `lib/pricing/adapters/*.ts` file in place
+   of its `integration-unavailable` stub — `lib/pricing/priority.ts`,
+   `lib/grocery/basket.ts`, and the Grocery UI already consume real
+   `CommodityPrice` data the moment an adapter produces it; no call site
+   should need to change.
 
 ## Supabase (next step)
 
