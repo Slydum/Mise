@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, Search } from "lucide-react";
+import { Camera, ImageUp, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -63,7 +63,8 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [ocrCandidates, setOcrCandidates] = useState<OcrCandidatePrice[] | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const libraryInputRef = useRef<HTMLInputElement>(null);
 
   const resetScan = () => {
     setScanning(false);
@@ -122,8 +123,6 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
   };
 
   const searchQuery = `how much is ${item.name.toLowerCase()}${city ? ` in ${city}` : " in the Philippines"}`;
-
-  const handleScanReceipt = () => fileInputRef.current?.click();
 
   const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -261,18 +260,46 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
 
               <div className="flex flex-col gap-1.5">
                 <input
-                  ref={fileInputRef}
+                  ref={cameraInputRef}
                   type="file"
                   accept="image/*"
                   capture="environment"
                   className="hidden"
                   onChange={handleFileSelected}
-                  aria-label="Photo of receipt"
+                  aria-label="Take a photo of receipt"
                 />
-                <Button type="button" variant="outline" size="sm" onClick={handleScanReceipt} disabled={scanning} className="w-fit">
-                  <Camera className="size-4" aria-hidden />
-                  {scanning ? "Reading photo…" : "Scan a receipt"}
-                </Button>
+                <input
+                  ref={libraryInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileSelected}
+                  aria-label="Upload a photo of receipt"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => cameraInputRef.current?.click()}
+                    disabled={scanning}
+                    className="flex-1"
+                  >
+                    <Camera className="size-4" aria-hidden />
+                    {scanning ? "Reading photo…" : "Take a photo"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => libraryInputRef.current?.click()}
+                    disabled={scanning}
+                    className="flex-1"
+                  >
+                    <ImageUp className="size-4" aria-hidden />
+                    Upload a photo
+                  </Button>
+                </div>
                 {scanError ? <p className="text-xs text-destructive">{scanError}</p> : null}
                 {ocrCandidates ? (
                   <div className="flex flex-wrap gap-1.5">
