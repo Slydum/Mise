@@ -39,12 +39,24 @@ export interface ReceiptOcrResult {
 const PRICE_NUMBER_PATTERN = /(?<!\d)\d{1,3}(?:,\d{3})*\.\d{2}(?!\d)/g;
 
 /**
+ * Receipt-summary vocabulary — subtotal, tax, and payment lines are
+ * price-shaped but are never an item's price, so a line built entirely
+ * around one of these words is excluded outright rather than left for the
+ * user to sift through. Deliberately narrow (whole-word match on known
+ * receipt-total terms) so it can't misfire on an actual product name.
+ */
+const NOISE_LINE_PATTERN =
+  /\b(sub ?total|total|cash|change|discount|balance|tender(ed)?|vat(able)?|(sales )?tax|amount due|service charge|due)\b/i;
+
+/**
  * Pure text-scanning step, separated from the OCR engine so it's directly
  * unit-testable against fixture strings without needing a real image or
  * network access. Never invents a price that isn't actually printed —
  * numbers are read verbatim from the OCR text, deduplicated, and bounded to
  * a plausible range (0, 999999] to filter out obvious OCR noise like a
- * misread barcode digit run.
+ * misread barcode digit run. Lines that are clearly a receipt total,
+ * tax, or payment summary (never an item's price) are skipped entirely —
+ * see NOISE_LINE_PATTERN.
  */
 export function extractCandidatePrices(rawText: string): OcrCandidatePrice[] {
   const seen = new Set<number>();
@@ -52,7 +64,7 @@ export function extractCandidatePrices(rawText: string): OcrCandidatePrice[] {
 
   for (const rawLine of rawText.split(/\r?\n/)) {
     const line = rawLine.trim();
-    if (!line) continue;
+    if (!line || NOISE_LINE_PATTERN.test(line)) continue;
     const matches = line.match(PRICE_NUMBER_PATTERN);
     if (!matches) continue;
     for (const match of matches) {
