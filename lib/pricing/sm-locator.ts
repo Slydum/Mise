@@ -24,12 +24,19 @@ const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
 
 function buildOverpassQuery(coords: Coordinates, radiusMeters: number): string {
   const around = `around:${radiusMeters},${coords.lat},${coords.lon}`;
-  const nameFilter = '["name"~"SM Supermarket|SM Hypermarket|SM Market|Savemore",i]';
+  // Broad on purpose: real-world OSM tagging of SM branches is inconsistent
+  // (a Hypermarket/Supermarket is often only mapped as part of the containing
+  // "SM City"/"SM Center" mall relation, not as its own supermarket-tagged
+  // node) — so this also matches the mall itself, and covers all three
+  // element types, rather than assuming a canonical tagging convention.
+  const nameFilter = '["name"~"SM Supermarket|SM Hypermarket|SM Market|SM City|SM Center|Savemore",i]';
+  const shopFilter = '["shop"~"supermarket|convenience|department_store|mall"]';
   return `
     [out:json][timeout:15];
     (
-      node(${around})["shop"~"supermarket|convenience|department_store"]${nameFilter};
-      way(${around})["shop"~"supermarket|convenience|department_store"]${nameFilter};
+      node(${around})${shopFilter}${nameFilter};
+      way(${around})${shopFilter}${nameFilter};
+      relation(${around})${shopFilter}${nameFilter};
     );
     out center;
   `;
@@ -69,7 +76,7 @@ export function rankNearbyStores(elements: OverpassElement[], from: Coordinates,
   return stores.sort((a, b) => a.distanceMeters - b.distanceMeters).slice(0, limit);
 }
 
-export async function findNearbySmStores(coords: Coordinates, radiusMeters = 15_000): Promise<NearbySmStore[]> {
+export async function findNearbySmStores(coords: Coordinates, radiusMeters = 20_000): Promise<NearbySmStore[]> {
   const response = await fetch(OVERPASS_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "text/plain" },
