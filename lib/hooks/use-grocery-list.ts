@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { generateGroceryItems } from "@/lib/data/grocery-generator";
 import { filterOutPantryItems } from "@/lib/grocery/aggregate";
 import { getCanonicalKey } from "@/lib/grocery/ingredient-catalog";
-import { purchaseRecordId, type PurchaseRecord } from "@/lib/grocery/purchase-history";
+import { purchaseRecordId, type PurchaseRecord, type PurchaseRecordPricingKind } from "@/lib/grocery/purchase-history";
 import type { PriceAdapterParams } from "@/lib/pricing/types";
 import {
   addGroceryItems,
@@ -19,6 +19,39 @@ import {
   updateExtraGroceryItem,
 } from "@/lib/data/local-store";
 import type { DietaryStyle, GroceryItem } from "@/lib/types";
+
+function buildPurchaseRecord(
+  item: GroceryItem,
+  pricePhp: number,
+  storeId: string,
+  source: PurchaseRecord["source"],
+  pricingKind: PurchaseRecordPricingKind,
+): PurchaseRecord {
+  const canonicalKey = item.canonicalKey ?? getCanonicalKey(item.name);
+  const isWeighted = pricingKind === "per-kg" || pricingKind === "per-liter";
+  const context = {
+    pricingKind,
+    packageAmount: isWeighted ? undefined : item.packageAmount,
+    packageUnit: isWeighted ? undefined : item.packageUnit,
+  };
+  return {
+    id: purchaseRecordId(canonicalKey, storeId, source, context),
+    canonicalKey,
+    storeId,
+    pricingKind,
+    pricePhp,
+    source,
+    ...(isWeighted ? {} : { packageAmount: item.packageAmount, packageUnit: item.packageUnit }),
+    productLabel: item.packageLabel,
+    purchasedAt: new Date().toISOString(),
+  };
+}
+
+export interface LoggedPriceAssignment {
+  item: GroceryItem;
+  pricePhp: number;
+  pricingKind: PurchaseRecordPricingKind;
+}
 
 export interface UseGroceryListResult {
   items: GroceryItem[];
@@ -37,9 +70,19 @@ export interface UseGroceryListResult {
    * verification (confirmed accurate today, without necessarily buying) at
    * the given store — history/verification, never presented as a live
    * current price. The store doesn't have to be the current/default one;
-   * any store the user names is logged.
+   * any store the user names is logged. `pricingKind` defaults to
+   * "package" (a flat price for the item's usual package); pass "per-kg"
+   * or "per-liter" for produce priced by weight/volume at the till.
    */
-  logPurchasePrice: (item: GroceryItem, pricePhp: number, storeId: string, source: PurchaseRecord["source"]) => void;
+  logPurchasePrice: (
+    item: GroceryItem,
+    pricePhp: number,
+    storeId: string,
+    source: PurchaseRecord["source"],
+    pricingKind?: PurchaseRecordPricingKind,
+  ) => void;
+  /** Same as logPurchasePrice, for every assignment from a single receipt scan — one refresh instead of one per item. */
+  logPurchasePrices: (assignments: LoggedPriceAssignment[], storeId: string, source: PurchaseRecord["source"]) => void;
   refresh: () => void;
 }
 
@@ -146,21 +189,24 @@ export function useGroceryList(
   );
 
   const logPurchasePrice = useCallback(
-    (item: GroceryItem, pricePhp: number, storeId: string, source: PurchaseRecord["source"]) => {
-      const canonicalKey = item.canonicalKey ?? getCanonicalKey(item.name);
-      const context = { packageAmount: item.packageAmount, packageUnit: item.packageUnit };
-      const record: PurchaseRecord = {
-        id: purchaseRecordId(canonicalKey, storeId, source, context),
-        canonicalKey,
-        storeId,
-        pricePhp,
-        source,
-        packageAmount: item.packageAmount,
-        packageUnit: item.packageUnit,
-        productLabel: item.packageLabel,
-        purchasedAt: new Date().toISOString(),
-      };
-      savePurchaseRecord(record);
+    (
+      item: GroceryItem,
+      pricePhp: number,
+      storeId: string,
+      source: PurchaseRecord["source"],
+      pricingKind: PurchaseRecordPricingKind = "package",
+    ) => {
+      savePurchaseRecord(buildPurchaseRecord(item, pricePhp, storeId, source, pricingKind));
+      refresh();
+    },
+    [refresh],
+  );
+
+  const logPurchasePrices = useCallback(
+    (assignments: LoggedPriceAssignment[], storeId: string, source: PurchaseRecord["source"]) => {
+      for (const a of assignments) {
+        savePurchaseRecord(buildPurchaseRecord(a.item, a.pricePhp, storeId, source, a.pricingKind));
+      }
       refresh();
     },
     [refresh],
@@ -179,6 +225,7 @@ export function useGroceryList(
     addToPantry,
     removeFromPantry,
     logPurchasePrice,
+    logPurchasePrices,
     refresh,
   };
 }

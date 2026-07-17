@@ -66,6 +66,15 @@ export interface CommodityPrice {
    * lib/pricing/priority.ts's exact-vs-broad enforcement.
    */
   isExactStorePrice: boolean;
+  /**
+   * True when this is a rate per kilogram/liter for something sold by
+   * weight or volume (e.g. avocado at ₱69/kg), not a price for a fixed
+   * package — `pricePerKgPhp`/`pricePerLiterPhp` carries the rate. Applies
+   * regardless of how much is bought, the same way a PSA reference does —
+   * see lib/pricing/priority.ts's per-unit-rate matching and
+   * lib/grocery/packages.ts's cost formula. A weighted price is never
+   * matched against a specific packageAmount/packageUnit.
+   */
   isWeighted: boolean;
 }
 

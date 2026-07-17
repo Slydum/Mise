@@ -93,12 +93,16 @@ function toKgOrLiter(amount: number, baseUnit: string): { amount: number; kind: 
 /**
  * Turns a resolved CommodityPrice into the cost figure for this grocery
  * line, per GROCERY CALCULATIONS:
- *   - PSA references: usageCost = requiredWeightInKg * officialPricePerKg
- *     (or per liter) — a market-reference/expected cost, not a guaranteed
- *     checkout price. Unavailable if the usage unit has no per-kg/per-liter
- *     meaning (e.g. "piece", "bunch") or the resolved price lacks that rate.
- *   - Every other source (receipt, user-verified, dti-epresyo): checkout
- *     cost = packageCount * packagePricePhp — an exact, real cost.
+ *   - Weighted prices (PSA references, or a receipt/verified per-kg rate
+ *     for produce sold by weight — see CommodityPrice.isWeighted):
+ *     usageCost = requiredWeightInKg * pricePerKg (or per liter) — an
+ *     expected cost that scales with however much is actually bought, not
+ *     a guaranteed checkout total. Unavailable if the usage unit has no
+ *     per-kg/per-liter meaning (e.g. "piece", "bunch") or the resolved
+ *     price lacks that rate.
+ *   - Package-priced sources (receipt, user-verified, dti-epresyo):
+ *     checkout cost = packageCount * packagePricePhp — an exact, real
+ *     cost for the specific package bought.
  */
 function computePriceInfo(
   line: UsageLine,
@@ -115,9 +119,7 @@ function computePriceInfo(
   const resolved = resolvePrice(context, candidates);
   if (!resolved) return undefined;
 
-  const isPsaReference = resolved.source === "psa-openstat" || resolved.source === "psa-price-situationer";
-
-  if (isPsaReference) {
+  if (resolved.isWeighted) {
     const converted = toKgOrLiter(line.amount, line.baseUnit);
     if (!converted) return undefined;
     const perUnitPrice = converted.kind === "kg" ? resolved.pricePerKgPhp : resolved.pricePerLiterPhp;

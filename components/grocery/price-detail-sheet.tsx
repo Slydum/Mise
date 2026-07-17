@@ -9,7 +9,7 @@ import { formatApproxPhp, formatPhp } from "@/lib/grocery/currency";
 import { formatQuantity } from "@/lib/ingredients";
 import { geographicLevelLabel, geographicLevelOf } from "@/lib/pricing/geographic";
 import { runReceiptOcr, type OcrCandidatePrice } from "@/lib/ocr/receipt-ocr";
-import type { PurchaseRecord } from "@/lib/grocery/purchase-history";
+import type { PurchaseRecord, PurchaseRecordPricingKind } from "@/lib/grocery/purchase-history";
 import type { GroceryItem, ShoppingStore } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -26,10 +26,21 @@ interface PriceDetailSheetProps {
   stores: ShoppingStore[];
   currentStoreId: string | null;
   city?: string;
-  onLogPrice: (pricePhp: number, source: PurchaseRecord["source"], store: LoggedStoreInput) => void;
+  onLogPrice: (
+    pricePhp: number,
+    source: PurchaseRecord["source"],
+    store: LoggedStoreInput,
+    pricingKind: PurchaseRecordPricingKind,
+  ) => void;
 }
 
 const NEW_STORE = "__new__";
+
+const PRICING_KINDS: { value: PurchaseRecordPricingKind; label: string }[] = [
+  { value: "package", label: "Whole purchase" },
+  { value: "per-kg", label: "Per kilogram" },
+  { value: "per-liter", label: "Per liter" },
+];
 
 function formatReferencePeriod(period: string): string {
   const match = /^(\d{4})-(\d{2})$/.exec(period);
@@ -56,6 +67,7 @@ function searchUrl(query: string): string {
  */
 export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStoreId, city, onLogPrice }: PriceDetailSheetProps) {
   const [logging, setLogging] = useState<PurchaseRecord["source"] | null>(null);
+  const [pricingKind, setPricingKind] = useState<PurchaseRecordPricingKind>("package");
   const [draftPrice, setDraftPrice] = useState("");
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(currentStoreId ?? stores[0]?.storeId ?? NEW_STORE);
   const [newStoreName, setNewStoreName] = useState("");
@@ -77,6 +89,7 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
     setWasOpen(open);
     if (open) {
       setLogging(null);
+      setPricingKind("package");
       setSelectedStoreId(currentStoreId ?? stores[0]?.storeId ?? NEW_STORE);
       setNewStoreName("");
       setNewStoreCity(city ?? "");
@@ -116,8 +129,9 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
           const s = stores.find((st) => st.storeId === selectedStoreId)!;
           return { storeName: s.storeName, storeCity: s.storeCity, storeAddress: s.storeAddress };
         })();
-    onLogPrice(parsed, logging, store);
+    onLogPrice(parsed, logging, store, pricingKind);
     setLogging(null);
+    setPricingKind("package");
     setDraftPrice("");
     resetScan();
   };
@@ -326,8 +340,40 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
                 ) : null}
               </div>
 
+              <div className="flex flex-col gap-1.5">
+                <p className="text-sm font-medium text-muted-foreground">How is it priced?</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {PRICING_KINDS.map((k) => (
+                    <button
+                      key={k.value}
+                      type="button"
+                      onClick={() => setPricingKind(k.value)}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        pricingKind === k.value ? "border-primary bg-primary/10" : "border-border/60 text-muted-foreground",
+                      )}
+                    >
+                      {k.label}
+                    </button>
+                  ))}
+                </div>
+                {pricingKind !== "package" ? (
+                  <p className="text-[11px] text-muted-foreground/70">
+                    A rate per {pricingKind === "per-kg" ? "kilogram" : "liter"} — applies no matter how much you buy, like
+                    produce weighed at the till. Only prices this item's grocery total when its needed amount is in{" "}
+                    {pricingKind === "per-kg" ? "grams/kilograms" : "milliliters/liters"}.
+                  </p>
+                ) : null}
+              </div>
+
               <label className="text-sm font-medium text-muted-foreground" htmlFor="log-price">
-                {logging === "receipt" ? "Price paid (₱)" : "Current price at the store (₱)"}
+                {pricingKind === "per-kg"
+                  ? "Price per kilogram (₱)"
+                  : pricingKind === "per-liter"
+                    ? "Price per liter (₱)"
+                    : logging === "receipt"
+                      ? "Price paid (₱)"
+                      : "Current price at the store (₱)"}
               </label>
               <Input
                 id="log-price"
@@ -343,6 +389,7 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
                   className="flex-1"
                   onClick={() => {
                     setLogging(null);
+                    setPricingKind("package");
                     resetScan();
                   }}
                 >

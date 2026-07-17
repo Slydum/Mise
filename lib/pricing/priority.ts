@@ -3,7 +3,7 @@ import type { CommodityPrice } from "@/lib/pricing/types";
 
 export interface PriceMatchContext {
   canonicalIngredientKey: string;
-  /** Exact-package context — required to match a receipt, a user-verified price, or a DTI monitored package. Irrelevant to PSA references, which price the commodity, not a package. */
+  /** Exact-package context — required to match a receipt, a user-verified price, or a DTI monitored package. Irrelevant to PSA references and to a weighted (per-kg/per-liter) receipt/verified rate, both of which price the commodity, not a package. */
   packageAmount?: number;
   packageUnit?: string;
   storeId?: string;
@@ -38,6 +38,10 @@ function matchesRequiredContext(price: CommodityPrice, context: PriceMatchContex
   switch (price.source) {
     case "receipt":
     case "user-verified":
+      if (price.isWeighted) {
+        // A per-kg/per-liter rate applies regardless of how much is bought — only the store matters, like a PSA reference.
+        return !price.storeId || price.storeId === context.storeId;
+      }
       // A price logged for one package size/branch never silently substitutes for another.
       return (
         price.amount === context.packageAmount &&

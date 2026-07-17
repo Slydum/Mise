@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MapPin, Package, Pencil, Plus, Share2 } from "lucide-react";
+import { MapPin, Package, Pencil, Plus, ReceiptText, Share2 } from "lucide-react";
 import Link from "next/link";
 import { AddGroceryItemSheet } from "@/components/grocery/add-grocery-item-sheet";
 import { PantrySheet } from "@/components/grocery/pantry-sheet";
 import { PriceDetailSheet } from "@/components/grocery/price-detail-sheet";
+import { ReceiptScanSheet } from "@/components/grocery/receipt-scan-sheet";
 import { ScreenHeader } from "@/components/screen-header";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -57,6 +58,7 @@ export function GroceryScreen() {
   const [editingItem, setEditingItem] = useState<GroceryItem | null>(null);
   const [pantryOpen, setPantryOpen] = useState(false);
   const [priceDetailItem, setPriceDetailItem] = useState<GroceryItem | null>(null);
+  const [receiptScanOpen, setReceiptScanOpen] = useState(false);
 
   const sections = useMemo(() => {
     const byCategory = new Map<GroceryCategory, GroceryItem[]>();
@@ -134,6 +136,9 @@ export function GroceryScreen() {
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" onClick={() => setPantryOpen(true)} aria-label="My Pantry">
             <Package className="size-5" aria-hidden />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setReceiptScanOpen(true)} aria-label="Scan a receipt">
+            <ReceiptText className="size-5" aria-hidden />
           </Button>
           <Button variant="ghost" size="icon" onClick={handleShare} aria-label="Share list">
             <Share2 className="size-5" aria-hidden />
@@ -381,12 +386,25 @@ export function GroceryScreen() {
         stores={shoppingSettings.stores}
         currentStoreId={shoppingSettings.currentStoreId}
         city={shoppingSettings.city ?? store?.storeCity}
-        onLogPrice={(pricePhp, source, storeInput) => {
+        onLogPrice={(pricePhp, source, storeInput, pricingKind) => {
           if (priceDetailItem) {
             const savedStore = addStore(storeInput.storeName, storeInput.storeCity, storeInput.storeAddress);
-            grocery.logPurchasePrice(priceDetailItem, pricePhp, savedStore.storeId, source);
+            grocery.logPurchasePrice(priceDetailItem, pricePhp, savedStore.storeId, source, pricingKind);
             showToast(source === "receipt" ? "Receipt price logged" : "Price verified");
           }
+        }}
+      />
+
+      <ReceiptScanSheet
+        open={receiptScanOpen}
+        onOpenChange={setReceiptScanOpen}
+        items={grocery.items}
+        stores={shoppingSettings.stores}
+        currentStoreId={shoppingSettings.currentStoreId}
+        onSave={(assignments, source, storeInput) => {
+          const savedStore = addStore(storeInput.storeName, storeInput.storeCity, storeInput.storeAddress);
+          grocery.logPurchasePrices(assignments, savedStore.storeId, source);
+          showToast(`${assignments.length} price${assignments.length === 1 ? "" : "s"} logged`);
         }}
       />
 

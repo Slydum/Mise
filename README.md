@@ -148,18 +148,40 @@ Key distinctions the app enforces everywhere:
   search in a new tab for the user to read themselves — Mise never reads,
   parses, or trusts search results as a price; it's purely a research aid
   before the user manually logs a number.
-- **"Scan a receipt"** runs on-device OCR (Tesseract.js, `lib/ocr/receipt-
+- **Receipt scanning** runs on-device OCR (Tesseract.js, `lib/ocr/receipt-
   ocr.ts`) on a photo and surfaces every price-shaped number it finds as a
-  tappable chip — it never auto-fills or auto-saves a price. Like the
-  location features below, this is genuinely functional in the deployed
-  app (it needs no server), but it does need real internet access the
-  first time it runs, since Tesseract.js fetches its language data from a
-  CDN — cached in the browser afterward. Not verified end-to-end from this
-  coding session for the same network-access reason as everywhere else in
-  this doc; verified instead is the pure candidate-extraction logic
-  (`lib/ocr/receipt-ocr.test.ts`) and that a failed OCR read degrades
-  gracefully to manual entry rather than getting stuck or crashing the
-  sheet.
+  tappable chip — it never auto-fills or auto-saves a price, and never
+  guesses which number belongs to which item (a real receipt has a price
+  per line plus subtotal/cash/change, all of which are price-shaped;
+  matching one to "avocado" specifically isn't something OCR text alone can
+  tell). Each candidate chip shows the OCR'd line it came from, so a wall
+  of numbers like "₱69 / ₱31 / ₱62 / ₱38" reads instead as "AVOCADO HASS
+  69.00/kg 31.19" vs. "BANANA LAKATAN 62.00/kg 38.44" — legible enough to
+  pick the right one without guessing. Two entry points: the price-detail
+  sheet scans for one item, or the Grocery screen's receipt icon
+  (`components/grocery/receipt-scan-sheet.tsx`) scans once and lets you
+  assign different prices on the same receipt to different grocery items
+  in one pass, so a single photo can log an entire trip instead of
+  reopening every item's sheet. Like the location features below, this is
+  genuinely functional in the deployed app (it needs no server), but it
+  does need real internet access the first time it runs, since
+  Tesseract.js fetches its language data from a CDN — cached in the
+  browser afterward. Not verified end-to-end from this coding session for
+  the same network-access reason as everywhere else in this doc; verified
+  instead is the pure candidate-extraction logic
+  (`lib/ocr/receipt-ocr.test.ts`, including against a real receipt's OCR
+  text) and that a failed OCR read degrades gracefully to manual entry
+  rather than getting stuck or crashing the sheet.
+- **Weighed produce gets a per-kg rate, not a fixed piece price.** Many
+  Philippine supermarkets price produce like avocado by weight (e.g.
+  ₱69/kg), not per piece. Logging a price offers a "Priced per kilogram" /
+  "per liter" choice alongside the default "whole purchase" price
+  (`PurchaseRecord.pricingKind`, `CommodityPrice.isWeighted`) — a weighted
+  rate applies no matter how much is bought, the same way a PSA reference
+  does, and only prices a grocery line when its needed amount is itself
+  weight-based (grams/kg or ml/L); a piece-counted usage line (e.g. "1
+  avocado" with no weight) honestly stays "Price unavailable" rather than
+  inventing an average weight per piece.
 
 ### What a real integration would need
 

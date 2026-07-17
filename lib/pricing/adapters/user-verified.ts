@@ -20,14 +20,19 @@ export function purchaseRecordToCommodityPrice(
       : `Verified at ${storeName}`
     : PRICE_SOURCE_LABELS[record.source];
 
+  const isWeighted = record.pricingKind === "per-kg" || record.pricingKind === "per-liter";
+  const rateUnit: CommodityUnit = record.pricingKind === "per-liter" ? "L" : "kg";
+
   return {
     id: record.id,
     canonicalIngredientKey: record.canonicalKey,
     displayName,
     commodityName: record.productLabel ?? displayName,
-    amount: record.packageAmount ?? 1,
-    unit: (record.packageUnit as CommodityUnit) ?? "piece",
+    amount: isWeighted ? 1 : (record.packageAmount ?? 1),
+    unit: isWeighted ? rateUnit : ((record.packageUnit as CommodityUnit) ?? "piece"),
     pricePhp: record.pricePhp,
+    ...(record.pricingKind === "per-kg" ? { pricePerKgPhp: record.pricePhp } : {}),
+    ...(record.pricingKind === "per-liter" ? { pricePerLiterPhp: record.pricePhp } : {}),
     source: record.source,
     sourceLabel,
     storeId: record.storeId,
@@ -36,7 +41,7 @@ export function purchaseRecordToCommodityPrice(
     fetchedAt: record.purchasedAt,
     verifiedAt: record.source === "user-verified" ? record.purchasedAt : undefined,
     isExactStorePrice: true,
-    isWeighted: false,
+    isWeighted,
   };
 }
 

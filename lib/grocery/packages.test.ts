@@ -85,6 +85,11 @@ function commodityPrice(overrides: Partial<CommodityPrice>): CommodityPrice {
   };
 }
 
+/** Package-priced sources (receipt/user-verified/dti-epresyo) in these tests are never weighted — only PSA fixtures inherit the default. */
+function packageCommodityPrice(overrides: Partial<CommodityPrice>): CommodityPrice {
+  return commodityPrice({ isWeighted: false, ...overrides });
+}
+
 describe("buildGroceryItems", () => {
   function usageLine(overrides: Partial<UsageLine>): UsageLine {
     return {
@@ -148,7 +153,7 @@ describe("buildGroceryItems", () => {
 
   it("computes an exact checkout cost (packageCount * pricePhp) for a receipt/DTI/user-verified candidate", () => {
     const candidates = [
-      commodityPrice({ canonicalIngredientKey: "canned tuna", source: "receipt", storeId: "sm-fairview", amount: 1, unit: "can", pricePhp: 35 }),
+      packageCommodityPrice({ canonicalIngredientKey: "canned tuna", source: "receipt", storeId: "sm-fairview", amount: 1, unit: "can", pricePhp: 35 }),
     ];
     const [item] = buildGroceryItems(
       [usageLine({ canonicalKey: "canned tuna", displayName: "Canned tuna", amount: 3, baseUnit: "can" })],
@@ -184,11 +189,42 @@ describe("buildGroceryItems", () => {
 
   it("never leaks a receipt price from a different store into the current basket", () => {
     const candidates = [
-      commodityPrice({ canonicalIngredientKey: "canned tuna", source: "receipt", storeId: "sm-north-edsa", amount: 1, unit: "can" }),
+      packageCommodityPrice({ canonicalIngredientKey: "canned tuna", source: "receipt", storeId: "sm-north-edsa", amount: 1, unit: "can" }),
     ];
     const [item] = buildGroceryItems(
       [usageLine({ canonicalKey: "canned tuna", displayName: "Canned tuna", amount: 1, baseUnit: "can" })],
       "sm-fairview",
+      candidates,
+    );
+    expect(item.priceInfo).toBeUndefined();
+  });
+
+  it("computes a usage-reference cost from a receipt/verified per-kg rate, the same way as a PSA reference", () => {
+    const candidates = [
+      commodityPrice({
+        canonicalIngredientKey: "avocado",
+        source: "receipt",
+        storeId: "puregold-imus",
+        isWeighted: true,
+        pricePerKgPhp: 69,
+      }),
+    ];
+    const [item] = buildGroceryItems(
+      [usageLine({ canonicalKey: "avocado", displayName: "Avocado", amount: 452, baseUnit: "g" })],
+      "puregold-imus",
+      candidates,
+    );
+    expect(item.priceInfo?.isUsageReference).toBe(true);
+    expect(item.priceInfo?.lineTotalPhp).toBeCloseTo(31.19, 2); // 0.452 kg * 69
+  });
+
+  it("a receipt per-kg rate doesn't price a piece-counted usage (no weight to convert)", () => {
+    const candidates = [
+      commodityPrice({ canonicalIngredientKey: "avocado", source: "receipt", storeId: "puregold-imus", isWeighted: true, pricePerKgPhp: 69 }),
+    ];
+    const [item] = buildGroceryItems(
+      [usageLine({ canonicalKey: "avocado", displayName: "Avocado", amount: 1, baseUnit: "piece" })],
+      "puregold-imus",
       candidates,
     );
     expect(item.priceInfo).toBeUndefined();

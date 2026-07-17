@@ -21,6 +21,11 @@ function price(overrides: Partial<CommodityPrice>): CommodityPrice {
   };
 }
 
+/** Package-priced sources (receipt/user-verified/dti-epresyo) in these tests are never weighted — only PSA fixtures inherit the default. */
+function packagePrice(overrides: Partial<CommodityPrice>): CommodityPrice {
+  return price({ isWeighted: false, ...overrides });
+}
+
 const context: PriceMatchContext = { canonicalIngredientKey: "onion", packageAmount: 1, packageUnit: "kg", storeId: "sm-fairview" };
 
 describe("resolvePrice", () => {
@@ -31,9 +36,9 @@ describe("resolvePrice", () => {
   it("a receipt price outranks every other source", () => {
     const candidates = [
       price({ id: "psa", source: "psa-openstat", region: "CALABARZON", pricePhp: 90 }),
-      price({ id: "dti", source: "dti-epresyo", pricePhp: 85, isExactStorePrice: false }),
-      price({ id: "verified", source: "user-verified", pricePhp: 88, storeId: "sm-fairview", isExactStorePrice: true }),
-      price({ id: "receipt", source: "receipt", pricePhp: 92, storeId: "sm-fairview", isExactStorePrice: true }),
+      packagePrice({ id: "dti", source: "dti-epresyo", pricePhp: 85, isExactStorePrice: false }),
+      packagePrice({ id: "verified", source: "user-verified", pricePhp: 88, storeId: "sm-fairview", isExactStorePrice: true }),
+      packagePrice({ id: "receipt", source: "receipt", pricePhp: 92, storeId: "sm-fairview", isExactStorePrice: true }),
     ];
     expect(resolvePrice(context, candidates)?.id).toBe("receipt");
   });
@@ -41,8 +46,8 @@ describe("resolvePrice", () => {
   it("a user-verified SM price outranks DTI and PSA when there's no receipt", () => {
     const candidates = [
       price({ id: "psa", source: "psa-openstat", region: "CALABARZON" }),
-      price({ id: "dti", source: "dti-epresyo" }),
-      price({ id: "verified", source: "user-verified", storeId: "sm-fairview", isExactStorePrice: true }),
+      packagePrice({ id: "dti", source: "dti-epresyo" }),
+      packagePrice({ id: "verified", source: "user-verified", storeId: "sm-fairview", isExactStorePrice: true }),
     ];
     expect(resolvePrice(context, candidates)?.id).toBe("verified");
   });
@@ -50,7 +55,7 @@ describe("resolvePrice", () => {
   it("DTI outranks every PSA geographic tier", () => {
     const candidates = [
       price({ id: "psa-city", source: "psa-openstat", city: "Imus" }),
-      price({ id: "dti", source: "dti-epresyo" }),
+      packagePrice({ id: "dti", source: "dti-epresyo" }),
     ];
     expect(resolvePrice(context, candidates)?.id).toBe("dti");
   });
@@ -66,17 +71,17 @@ describe("resolvePrice", () => {
   });
 
   it("a package-size-specific receipt does not apply to a different package size", () => {
-    const candidates = [price({ source: "receipt", storeId: "sm-fairview", amount: 6, unit: "kg" })];
+    const candidates = [packagePrice({ source: "receipt", storeId: "sm-fairview", amount: 6, unit: "kg" })];
     expect(resolvePrice(context, candidates)).toBeUndefined();
   });
 
   it("a receipt from a different store does not apply to the currently selected store", () => {
-    const candidates = [price({ source: "receipt", storeId: "sm-north-edsa", amount: 1, unit: "kg" })];
+    const candidates = [packagePrice({ source: "receipt", storeId: "sm-north-edsa", amount: 1, unit: "kg" })];
     expect(resolvePrice(context, candidates)).toBeUndefined();
   });
 
   it("DTI matches by package but ignores store — it isn't store-specific", () => {
-    const candidates = [price({ source: "dti-epresyo", amount: 1, unit: "kg", storeId: undefined })];
+    const candidates = [packagePrice({ source: "dti-epresyo", amount: 1, unit: "kg", storeId: undefined })];
     expect(resolvePrice(context, candidates)?.source).toBe("dti-epresyo");
   });
 
@@ -109,7 +114,7 @@ describe("resolvePrice", () => {
 
   it("preserves the source URL and reference period on the resolved price, unmodified", () => {
     const candidates = [
-      price({
+      packagePrice({
         source: "dti-epresyo",
         sourceUrl: "https://www.dti.gov.ph/konsyumer/e-presyo/",
         referencePeriod: "2026-07",
@@ -118,5 +123,16 @@ describe("resolvePrice", () => {
     const resolved = resolvePrice(context, candidates);
     expect(resolved?.sourceUrl).toBe("https://www.dti.gov.ph/konsyumer/e-presyo/");
     expect(resolved?.referencePeriod).toBe("2026-07");
+  });
+
+  it("a per-kg receipt rate applies regardless of package size, like a PSA reference", () => {
+    const candidates = [packagePrice({ source: "receipt", storeId: "sm-fairview", isWeighted: true, pricePerKgPhp: 69 })];
+    const resolved = resolvePrice(context, candidates);
+    expect(resolved?.pricePerKgPhp).toBe(69);
+  });
+
+  it("a per-kg receipt rate still respects store scoping", () => {
+    const candidates = [packagePrice({ source: "receipt", storeId: "sm-north-edsa", isWeighted: true, pricePerKgPhp: 69 })];
+    expect(resolvePrice(context, candidates)).toBeUndefined();
   });
 });

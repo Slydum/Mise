@@ -7,6 +7,7 @@ function record(overrides: Partial<PurchaseRecord>): PurchaseRecord {
     id: "r1",
     canonicalKey: "canned tuna",
     storeId: "sm-fairview",
+    pricingKind: "package",
     pricePhp: 38,
     source: "receipt",
     purchasedAt: "2026-07-10T00:00:00Z",
@@ -43,6 +44,30 @@ describe("purchaseRecordToCommodityPrice", () => {
   it("falls back to a generic label when no store name is available", () => {
     expect(purchaseRecordToCommodityPrice(record({ source: "receipt" }), "x").sourceLabel).toBe("Last paid price");
     expect(purchaseRecordToCommodityPrice(record({ source: "user-verified" }), "x").sourceLabel).toBe("Verified in-store");
+  });
+
+  it("marks a per-kg record as weighted and populates pricePerKgPhp, not a package price", () => {
+    const commodity = purchaseRecordToCommodityPrice(
+      record({ pricingKind: "per-kg", pricePhp: 69, packageAmount: undefined, packageUnit: undefined }),
+      "Avocado",
+    );
+    expect(commodity.isWeighted).toBe(true);
+    expect(commodity.pricePerKgPhp).toBe(69);
+    expect(commodity.pricePerLiterPhp).toBeUndefined();
+    expect(commodity.unit).toBe("kg");
+    expect(commodity.isExactStorePrice).toBe(true);
+  });
+
+  it("marks a per-liter record as weighted and populates pricePerLiterPhp", () => {
+    const commodity = purchaseRecordToCommodityPrice(record({ pricingKind: "per-liter", pricePhp: 95 }), "Cooking oil");
+    expect(commodity.isWeighted).toBe(true);
+    expect(commodity.pricePerLiterPhp).toBe(95);
+    expect(commodity.pricePerKgPhp).toBeUndefined();
+    expect(commodity.unit).toBe("L");
+  });
+
+  it("a package-priced record is never marked weighted", () => {
+    expect(purchaseRecordToCommodityPrice(record({ pricingKind: "package" }), "x").isWeighted).toBe(false);
   });
 });
 
