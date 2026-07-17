@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { aggregateIngredients } from "@/lib/grocery/aggregate";
 import { buildGroceryItems, roundToPracticalAmount, selectPurchase } from "@/lib/grocery/packages";
 import type { UsageLine } from "@/lib/grocery/aggregate";
-import type { PurchaseRecord } from "@/lib/grocery/purchase-history";
+import type { CommodityPrice } from "@/lib/pricing/types";
 import type { Ingredient } from "@/lib/types";
 
 describe("roundToPracticalAmount", () => {
@@ -66,6 +66,25 @@ describe("selectPurchase", () => {
   });
 });
 
+function commodityPrice(overrides: Partial<CommodityPrice>): CommodityPrice {
+  return {
+    id: "test-price",
+    canonicalIngredientKey: "onion",
+    displayName: "Onion",
+    commodityName: "Onion, Red",
+    amount: 1,
+    unit: "kg",
+    pricePhp: 90,
+    source: "psa-openstat",
+    sourceLabel: "Official market reference",
+    referencePeriod: "2026-06",
+    fetchedAt: "2026-06-15T00:00:00Z",
+    isExactStorePrice: false,
+    isWeighted: true,
+    ...overrides,
+  };
+}
+
 describe("buildGroceryItems", () => {
   function usageLine(overrides: Partial<UsageLine>): UsageLine {
     return {
@@ -120,48 +139,59 @@ describe("buildGroceryItems", () => {
     expect(item.unit).toBe("kilogram");
   });
 
-  it("never fabricates a live price — every item is unavailable without a real SM adapter", () => {
+  it("never fabricates a price — no priceInfo without a matching candidate", () => {
     const [item] = buildGroceryItems([
       usageLine({ canonicalKey: "canned tuna", displayName: "Canned tuna", amount: 3, baseUnit: "can" }),
     ]);
-    expect(item.livePriceStatus).toBe("unavailable");
-    expect(item.liveTotalPricePhp).toBeUndefined();
+    expect(item.priceInfo).toBeUndefined();
   });
 
-  it("has no price at all without a selected store, even with purchase history for the ingredient elsewhere", () => {
-    const records: PurchaseRecord[] = [
-      { id: "r1", canonicalKey: "canned tuna", storeId: "sm-fairview", pricePhp: 35, purchasedAt: "2026-07-01" },
+  it("computes an exact checkout cost (packageCount * pricePhp) for a receipt/DTI/user-verified candidate", () => {
+    const candidates = [
+      commodityPrice({ canonicalIngredientKey: "canned tuna", source: "receipt", storeId: "sm-fairview", amount: 1, unit: "can", pricePhp: 35 }),
     ];
     const [item] = buildGroceryItems(
-      [usageLine({ canonicalKey: "canned tuna", displayName: "Canned tuna", amount: 1, baseUnit: "can" })],
+      [usageLine({ canonicalKey: "canned tuna", displayName: "Canned tuna", amount: 3, baseUnit: "can" })],
+      "sm-fairview",
+      candidates,
+    );
+    expect(item.priceInfo?.isUsageReference).toBe(false);
+    expect(item.priceInfo?.packageCount).toBe(3);
+    expect(item.priceInfo?.lineTotalPhp).toBe(105); // 3 packages * 35
+  });
+
+  it("computes a usage-reference cost (requiredWeightKg * pricePerKg) for a PSA candidate", () => {
+    const candidates = [commodityPrice({ source: "psa-openstat", region: "CALABARZON", pricePerKgPhp: 140 })];
+    const [item] = buildGroceryItems(
+      [usageLine({ canonicalKey: "onion", displayName: "Onion", amount: 1200, baseUnit: "g" })],
       null,
-      records,
+      candidates,
     );
-    expect(item.lastPaidPricePhp).toBeUndefined();
+    expect(item.priceInfo?.isUsageReference).toBe(true);
+    expect(item.priceInfo?.lineTotalPhp).toBe(168); // 1.2 kg * 140
+    expect(item.priceInfo?.packageCount).toBeUndefined();
   });
 
-  it("surfaces the most recent matching purchase-history record as lastPaid, scoped to the given store", () => {
-    const records: PurchaseRecord[] = [
-      { id: "r1", canonicalKey: "canned tuna", storeId: "sm-fairview", pricePhp: 35, purchasedAt: "2026-06-01" },
-      { id: "r2", canonicalKey: "canned tuna", storeId: "sm-fairview", pricePhp: 38, purchasedAt: "2026-07-10" },
-      { id: "r3", canonicalKey: "canned tuna", storeId: "sm-north-edsa", pricePhp: 99, purchasedAt: "2026-07-12" },
+  it("leaves a PSA reference unresolved when the usage unit has no per-kg/per-liter meaning (e.g. pieces)", () => {
+    const candidates = [commodityPrice({ source: "psa-openstat", pricePerKgPhp: 140 })];
+    const [item] = buildGroceryItems(
+      [usageLine({ canonicalKey: "onion", displayName: "Onion", amount: 3, baseUnit: "piece" })],
+      null,
+      candidates,
+    );
+    expect(item.priceInfo).toBeUndefined();
+  });
+
+  it("never leaks a receipt price from a different store into the current basket", () => {
+    const candidates = [
+      commodityPrice({ canonicalIngredientKey: "canned tuna", source: "receipt", storeId: "sm-north-edsa", amount: 1, unit: "can" }),
     ];
     const [item] = buildGroceryItems(
       [usageLine({ canonicalKey: "canned tuna", displayName: "Canned tuna", amount: 1, baseUnit: "can" })],
       "sm-fairview",
-      records,
+      candidates,
     );
-    expect(item.lastPaidPricePhp).toBe(38);
-    expect(item.lastPaidStoreId).toBe("sm-fairview");
-  });
-
-  it("never shows a lastPaid price for an ingredient with no matching purchase history — not ₱0", () => {
-    const [item] = buildGroceryItems(
-      [usageLine({ canonicalKey: "onion", displayName: "Onion", amount: 500, baseUnit: "g" })],
-      "sm-fairview",
-      [],
-    );
-    expect(item.lastPaidPricePhp).toBeUndefined();
+    expect(item.priceInfo).toBeUndefined();
   });
 
   it("scales quantities by the servings ratio before purchase selection", () => {

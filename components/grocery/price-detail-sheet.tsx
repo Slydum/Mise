@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { formatApproxPhp } from "@/lib/grocery/currency";
+import { formatApproxPhp, formatPhp } from "@/lib/grocery/currency";
 import { formatQuantity } from "@/lib/ingredients";
-import { SM_INTEGRATION_UNAVAILABLE_REASON } from "@/lib/sm/adapter";
+import { geographicLevelLabel, geographicLevelOf } from "@/lib/pricing/geographic";
+import type { PurchaseRecord } from "@/lib/grocery/purchase-history";
 import type { GroceryItem } from "@/lib/types";
 
 interface PriceDetailSheetProps {
@@ -14,35 +16,67 @@ interface PriceDetailSheetProps {
   onOpenChange: (open: boolean) => void;
   item: GroceryItem | null;
   storeName?: string;
-  onLogPrice: (pricePhp: number) => void;
+  city?: string;
+  onLogPrice: (pricePhp: number, source: PurchaseRecord["source"]) => void;
 }
 
-/** Bottom sheet showing the full package breakdown behind a grocery row, its (always-unavailable) live price status, and any purchase history — with a "Log price paid" action. */
-export function PriceDetailSheet({ open, onOpenChange, item, storeName, onLogPrice }: PriceDetailSheetProps) {
-  const [logging, setLogging] = useState(false);
+function formatReferencePeriod(period: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(period);
+  if (!match) return period;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, 1);
+  return date.toLocaleDateString("en-PH", { month: "long", year: "numeric" });
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function searchUrl(query: string): string {
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+}
+
+/**
+ * Bottom sheet showing the full breakdown behind a grocery row's price (or
+ * why one isn't available), and two ways to add real local data: search the
+ * web yourself (opens in a new tab — Mise never reads or interprets the
+ * results, you decide what to trust), or log a receipt/verified SM price.
+ */
+export function PriceDetailSheet({ open, onOpenChange, item, storeName, city, onLogPrice }: PriceDetailSheetProps) {
+  const [logging, setLogging] = useState<PurchaseRecord["source"] | null>(null);
   const [draftPrice, setDraftPrice] = useState("");
 
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) {
-      setLogging(false);
-      setDraftPrice(item?.lastPaidPricePhp !== undefined ? String(item.lastPaidPricePhp) : "");
-    }
+    if (open) setLogging(null);
   }
 
   if (!item) return null;
 
-  const lastPaidLabel = item.lastPaidAt
-    ? new Date(item.lastPaidAt).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })
+  const price = item.priceInfo?.price;
+  const geoLabel = price
+    ? price.city || price.province || price.region
+      ? `${geographicLevelLabel(geographicLevelOf(price))} — ${price.city ?? price.province ?? price.region}`
+      : price.storeName ?? storeName
+    : undefined;
+  const unitPriceLabel = price
+    ? price.pricePerKgPhp !== undefined
+      ? `${formatPhp(price.pricePerKgPhp)} per kg`
+      : price.pricePerLiterPhp !== undefined
+        ? `${formatPhp(price.pricePerLiterPhp)} per L`
+        : formatPhp(price.pricePhp)
     : undefined;
 
   const handleSave = () => {
+    if (!logging) return;
     const parsed = Number(draftPrice.replace(/[^0-9.]/g, ""));
     if (!Number.isFinite(parsed) || parsed < 0) return;
-    onLogPrice(parsed);
-    setLogging(false);
+    onLogPrice(parsed, logging);
+    setLogging(null);
+    setDraftPrice("");
   };
+
+  const searchQuery = `how much is ${item.name.toLowerCase()}${city ? ` in ${city}` : " in the Philippines"}`;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -54,26 +88,66 @@ export function PriceDetailSheet({ open, onOpenChange, item, storeName, onLogPri
               label="Needed for your plan"
               value={item.usageAmount !== undefined ? formatQuantity(item.usageAmount, item.usageUnit ?? "") : "—"}
             />
-            <Row label="Suggested SM package" value={item.packageLabel ?? "No matching package"} />
+            <Row label="Suggested package" value={item.packageLabel ?? "No matching package"} />
             {item.packageAmount !== undefined ? (
               <Row label="Package size" value={formatQuantity(item.packageAmount, item.packageUnit ?? "")} />
             ) : null}
             {item.packageCount !== undefined ? <Row label="Packages to buy" value={String(item.packageCount)} /> : null}
-            <Row label="Live SM price" value="Unavailable" hint={SM_INTEGRATION_UNAVAILABLE_REASON} />
-            {item.lastPaidPricePhp !== undefined ? (
-              <Row
-                label="Last paid"
-                value={`${formatApproxPhp(item.lastPaidPricePhp)}${lastPaidLabel ? ` · ${lastPaidLabel}` : ""}`}
-                hint="What you logged after a past shopping trip — not today's price."
-              />
-            ) : null}
-            {storeName ? <Row label="Store" value={storeName} /> : null}
+
+            {price ? (
+              <>
+                <Row label="Commodity / product" value={price.commodityName} />
+                <Row label="Unit price" value={unitPriceLabel ?? "—"} />
+                <Row
+                  label={item.priceInfo!.isUsageReference ? "Estimated cost" : "Line total"}
+                  value={`${item.priceInfo!.isUsageReference ? "≈ " : ""}${formatPhp(item.priceInfo!.lineTotalPhp)}`}
+                  hint={
+                    item.priceInfo!.isUsageReference
+                      ? "A market-reference estimate, not a guaranteed checkout price."
+                      : undefined
+                  }
+                />
+                {geoLabel ? <Row label="Coverage" value={geoLabel} /> : null}
+                <Row label="Source" value={price.sourceLabel} />
+                <Row label="Reference period" value={formatReferencePeriod(price.referencePeriod)} />
+                <Row label={price.verifiedAt ? "Verified" : "Fetched"} value={formatDate(price.verifiedAt ?? price.fetchedAt)} />
+                {price.sourceUrl ? (
+                  <div className="px-4 py-3">
+                    <a
+                      href={price.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-medium text-primary underline underline-offset-2"
+                    >
+                      Open source
+                    </a>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <Row label="Price" value="Price unavailable" hint="No PSA, DTI, or verified SM price is available for this item yet." />
+            )}
           </dl>
+
+          <a
+            href={searchUrl(searchQuery)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex min-h-12 items-center gap-3 rounded-2xl border border-dashed border-border px-4 py-2.5 text-sm font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring active:bg-muted"
+          >
+            <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="min-w-0 flex-1">
+              Search prices online
+              <span className="block text-xs font-normal text-muted-foreground">
+                Opens in a new tab — unverified, read it yourself before logging a price below.
+              </span>
+            </span>
+          </a>
 
           {logging ? (
             <div className="flex flex-col gap-3">
               <label className="text-sm font-medium text-muted-foreground" htmlFor="log-price">
-                Price paid (₱)
+                {logging === "receipt" ? "Price paid (₱)" : "Current price at SM (₱)"}
               </label>
               <Input
                 id="log-price"
@@ -81,10 +155,10 @@ export function PriceDetailSheet({ open, onOpenChange, item, storeName, onLogPri
                 inputMode="decimal"
                 value={draftPrice}
                 onChange={(e) => setDraftPrice(e.target.value)}
-                aria-label="Price paid"
+                aria-label="Price in pesos"
               />
               <div className="flex gap-2">
-                <Button variant="ghost" className="flex-1" onClick={() => setLogging(false)}>
+                <Button variant="ghost" className="flex-1" onClick={() => setLogging(null)}>
                   Cancel
                 </Button>
                 <Button className="flex-1" onClick={handleSave}>
@@ -93,9 +167,14 @@ export function PriceDetailSheet({ open, onOpenChange, item, storeName, onLogPri
               </div>
             </div>
           ) : (
-            <Button variant="secondary" onClick={() => setLogging(true)} disabled={!storeName}>
-              Log price paid
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="secondary" className="flex-1" onClick={() => setLogging("receipt")} disabled={!storeName}>
+                Log receipt price
+              </Button>
+              <Button variant="secondary" className="flex-1" onClick={() => setLogging("user-verified-sm")} disabled={!storeName}>
+                Verify at SM
+              </Button>
+            </div>
           )}
           {!storeName ? (
             <p className="text-center text-xs text-muted-foreground">Select an SM store in Profile to log a price.</p>

@@ -1,6 +1,36 @@
 import { describe, expect, it } from "vitest";
-import { deriveBasketStatus, summarizeBasket } from "@/lib/grocery/basket";
-import type { GroceryItem, LivePriceStatus } from "@/lib/types";
+import { describeBasketOutlook, summarizeBasket } from "@/lib/grocery/basket";
+import type { CommodityPrice } from "@/lib/pricing/types";
+import type { GroceryItem, GroceryItemPriceInfo } from "@/lib/types";
+
+function commodityPrice(overrides: Partial<CommodityPrice>): CommodityPrice {
+  return {
+    id: "test-price",
+    canonicalIngredientKey: "onion",
+    displayName: "Onion",
+    commodityName: "Onion, Red",
+    amount: 1,
+    unit: "kg",
+    pricePhp: 90,
+    source: "receipt",
+    sourceLabel: "Last paid at SM",
+    referencePeriod: "2026-07",
+    fetchedAt: "2026-07-10T00:00:00Z",
+    storeId: "sm-fairview",
+    isExactStorePrice: true,
+    isWeighted: false,
+    ...overrides,
+  };
+}
+
+function priceInfo(overrides: Partial<GroceryItemPriceInfo>): GroceryItemPriceInfo {
+  return {
+    price: commodityPrice({}),
+    lineTotalPhp: 100,
+    isUsageReference: false,
+    ...overrides,
+  };
+}
 
 function item(overrides: Partial<GroceryItem>): GroceryItem {
   return {
@@ -9,100 +39,103 @@ function item(overrides: Partial<GroceryItem>): GroceryItem {
     amount: 1,
     unit: "piece",
     category: "produce",
-    livePriceStatus: "unavailable",
     ...overrides,
   };
 }
 
 describe("summarizeBasket", () => {
-  it("sums live totals across live-priced items, checked and unchecked alike", () => {
+  it("sums exact-price line totals across items, checked and unchecked alike", () => {
     const items = [
-      item({ id: "a", livePriceStatus: "live", liveTotalPricePhp: 1200 }),
-      item({ id: "b", livePriceStatus: "live", liveTotalPricePhp: 800 }),
+      item({ id: "a", priceInfo: priceInfo({ lineTotalPhp: 1200, isUsageReference: false }) }),
+      item({ id: "b", priceInfo: priceInfo({ lineTotalPhp: 800, isUsageReference: false }) }),
     ];
-    expect(summarizeBasket(items, 3000).liveTotalPhp).toBe(2000);
+    const summary = summarizeBasket(items, 3000, "sm-fairview");
+    expect(summary.exactTotalPhp).toBe(2000);
+    expect(summary.projectedTotalPhp).toBe(2000);
   });
 
-  it("excludes unavailable items from the total instead of treating them as ₱0", () => {
-    const items = [item({ id: "a", livePriceStatus: "live", liveTotalPricePhp: 500 }), item({ id: "b" })];
-    const summary = summarizeBasket(items, 3000);
-    expect(summary.liveTotalPhp).toBe(500);
-    expect(summary.livePricedCount).toBe(1);
+  it("keeps PSA reference totals in a separate bucket from exact totals", () => {
+    const items = [
+      item({ id: "a", priceInfo: priceInfo({ lineTotalPhp: 500, isUsageReference: false }) }),
+      item({ id: "b", priceInfo: priceInfo({ lineTotalPhp: 300, isUsageReference: true }) }),
+    ];
+    const summary = summarizeBasket(items, 3000, "sm-fairview");
+    expect(summary.exactTotalPhp).toBe(500);
+    expect(summary.referenceTotalPhp).toBe(300);
+    expect(summary.projectedTotalPhp).toBe(800);
+  });
+
+  it("excludes unpriced items from the total instead of treating them as ₱0", () => {
+    const items = [item({ id: "a", priceInfo: priceInfo({ lineTotalPhp: 500 }) }), item({ id: "b" })];
+    const summary = summarizeBasket(items, 3000, "sm-fairview");
+    expect(summary.projectedTotalPhp).toBe(500);
+    expect(summary.pricedCount).toBe(1);
     expect(summary.unavailableCount).toBe(1);
-    expect(summary.isLiveComplete).toBe(false);
   });
 
-  it("never sums a user's lastPaid (historical) price into the live total", () => {
-    const items = [item({ id: "a", lastPaidPricePhp: 500, lastPaidAt: "2026-06-01" })];
-    const summary = summarizeBasket(items, 3000);
-    expect(summary.liveTotalPhp).toBe(0);
-    expect(summary.livePricedCount).toBe(0);
-    expect(summary.unavailableCount).toBe(1);
-  });
-
-  it("a manually-added item without a price doesn't affect the total", () => {
-    const items = [item({ id: "extra-manual-1", name: "Napkins" })];
-    expect(summarizeBasket(items, 3000).liveTotalPhp).toBe(0);
-  });
-
-  it("has no budget delta at all when nothing is live-priced yet — never compares a fabricated total to the budget", () => {
+  it("has no budget delta at all when nothing is priced yet", () => {
     const items = [item({ id: "a" })];
-    expect(summarizeBasket(items, 3000).budgetDeltaPhp).toBeNull();
+    expect(summarizeBasket(items, 3000, "sm-fairview").budgetDeltaPhp).toBeNull();
   });
 
-  it("reports under budget when the live total is below the weekly budget", () => {
-    const items = [item({ livePriceStatus: "live", liveTotalPricePhp: 2485 })];
-    const summary = summarizeBasket(items, 3000);
-    expect(summary.budgetDeltaPhp).toBe(515);
+  it("reports under budget when the projected total is below the weekly budget", () => {
+    const items = [item({ priceInfo: priceInfo({ lineTotalPhp: 2485 }) })];
+    expect(summarizeBasket(items, 3000, "sm-fairview").budgetDeltaPhp).toBe(515);
   });
 
-  it("reports over budget when the live total exceeds the weekly budget", () => {
-    const items = [item({ livePriceStatus: "live", liveTotalPricePhp: 3600 })];
-    const summary = summarizeBasket(items, 3000);
-    expect(summary.budgetDeltaPhp).toBe(-600);
+  it("reports over budget when the projected total exceeds the weekly budget", () => {
+    const items = [item({ priceInfo: priceInfo({ lineTotalPhp: 3600 }) })];
+    expect(summarizeBasket(items, 3000, "sm-fairview").budgetDeltaPhp).toBe(-600);
   });
 
-  it("is live-complete only when every item has a live price", () => {
+  it("is fully verified at store only when every item is an exact SM price confirmed at the given store", () => {
     const items = [
-      item({ id: "a", livePriceStatus: "live", liveTotalPricePhp: 100 }),
-      item({ id: "b", livePriceStatus: "live", liveTotalPricePhp: 200 }),
+      item({ id: "a", priceInfo: priceInfo({ price: commodityPrice({ source: "receipt", storeId: "sm-fairview" }) }) }),
+      item({ id: "b", priceInfo: priceInfo({ price: commodityPrice({ source: "user-verified-sm", storeId: "sm-fairview" }) }) }),
     ];
-    expect(summarizeBasket(items, 3000).isLiveComplete).toBe(true);
+    expect(summarizeBasket(items, 3000, "sm-fairview").isFullyVerifiedAtStore).toBe(true);
   });
 
-  it("today, with no SM adapter connected, is never live-complete for a non-empty basket", () => {
-    const items = [item({ id: "a" }), item({ id: "b" })];
-    expect(summarizeBasket(items, 3000).isLiveComplete).toBe(false);
-    expect(summarizeBasket(items, 3000).liveTotalPhp).toBe(0);
+  it("is not fully verified when a DTI or PSA reference is included, even alongside exact SM prices", () => {
+    const items = [
+      item({ id: "a", priceInfo: priceInfo({ price: commodityPrice({ source: "receipt", storeId: "sm-fairview" }) }) }),
+      item({ id: "b", priceInfo: priceInfo({ price: commodityPrice({ source: "dti-epresyo" }), isUsageReference: false }) }),
+    ];
+    expect(summarizeBasket(items, 3000, "sm-fairview").isFullyVerifiedAtStore).toBe(false);
+  });
+
+  it("is not fully verified when an exact price came from a different store", () => {
+    const items = [item({ priceInfo: priceInfo({ price: commodityPrice({ source: "receipt", storeId: "sm-north-edsa" }) }) })];
+    expect(summarizeBasket(items, 3000, "sm-fairview").isFullyVerifiedAtStore).toBe(false);
+  });
+
+  it("is not fully verified when any item is unpriced", () => {
+    const items = [
+      item({ id: "a", priceInfo: priceInfo({ price: commodityPrice({ source: "receipt", storeId: "sm-fairview" }) }) }),
+      item({ id: "b" }),
+    ];
+    expect(summarizeBasket(items, 3000, "sm-fairview").isFullyVerifiedAtStore).toBe(false);
   });
 });
 
-describe("deriveBasketStatus", () => {
-  function withStatuses(...statuses: LivePriceStatus[]): GroceryItem[] {
-    return statuses.map((livePriceStatus, i) => item({ id: `item-${i}`, livePriceStatus }));
-  }
-
-  it("is unavailable for an empty basket", () => {
-    expect(deriveBasketStatus([])).toBe("unavailable");
+describe("describeBasketOutlook", () => {
+  it("is unavailable when nothing is priced", () => {
+    const summary = summarizeBasket([item({})], 3000, "sm-fairview");
+    expect(describeBasketOutlook(summary)).toBe("unavailable");
   });
 
-  it("is unavailable when every item is unavailable — the honest default with no SM adapter", () => {
-    expect(deriveBasketStatus(withStatuses("unavailable", "unavailable"))).toBe("unavailable");
+  it("is verified when every price is an exact SM price at the current store", () => {
+    const items = [item({ priceInfo: priceInfo({ price: commodityPrice({ source: "receipt", storeId: "sm-fairview" }) }) })];
+    const summary = summarizeBasket(items, 3000, "sm-fairview");
+    expect(describeBasketOutlook(summary)).toBe("verified");
   });
 
-  it("is live when every item is live", () => {
-    expect(deriveBasketStatus(withStatuses("live", "live"))).toBe("live");
-  });
-
-  it("is recently-checked when items are a live/recently-checked mix with no stale items", () => {
-    expect(deriveBasketStatus(withStatuses("live", "recently-checked"))).toBe("recently-checked");
-  });
-
-  it("is partially-available when some items are live-ish and some are not", () => {
-    expect(deriveBasketStatus(withStatuses("live", "unavailable"))).toBe("partially-available");
-  });
-
-  it("is refresh-required when stale items exist but none are live-ish", () => {
-    expect(deriveBasketStatus(withStatuses("refresh-required", "unavailable"))).toBe("refresh-required");
+  it("is projected for a mixed-source basket (exact prices plus PSA references)", () => {
+    const items = [
+      item({ id: "a", priceInfo: priceInfo({ price: commodityPrice({ source: "receipt", storeId: "sm-fairview" }) }) }),
+      item({ id: "b", priceInfo: priceInfo({ price: commodityPrice({ source: "psa-openstat" }), isUsageReference: true }) }),
+    ];
+    const summary = summarizeBasket(items, 3000, "sm-fairview");
+    expect(describeBasketOutlook(summary)).toBe("projected");
   });
 });

@@ -1,5 +1,7 @@
 /** Core domain types for Mise. Shared by the mock data layer today and Supabase later. */
 
+import type { CommodityPrice } from "@/lib/pricing/types";
+
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
 export const MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
@@ -189,6 +191,23 @@ export function hasRecipeContent(recipe: Recipe): boolean {
  */
 export type LivePriceStatus = "live" | "recently-checked" | "refresh-required" | "unavailable";
 
+/**
+ * The resolved price behind a grocery row, per the unified official-pricing
+ * model in lib/pricing/ (PSA OpenSTAT/Price Situationer, DTI e-Presyo, and
+ * the user's own SM verifications/receipts — see lib/pricing/priority.ts
+ * for the 8-tier resolution). Absent entirely means "Price unavailable" —
+ * never fabricated, never ₱0.
+ */
+export interface GroceryItemPriceInfo {
+  price: CommodityPrice;
+  /** Number of packages to buy — only meaningful for exact-package sources (receipt/user-verified-sm/dti-epresyo), not PSA per-kg references. */
+  packageCount?: number;
+  /** packageCount * price.pricePhp for an exact package, or requiredWeightKg * price.pricePerKgPhp for a PSA reference. */
+  lineTotalPhp: number;
+  /** True when lineTotalPhp is a market-reference/expected cost (PSA), not a checkout price. See GROCERY CALCULATIONS in lib/grocery/packages.ts. */
+  isUsageReference: boolean;
+}
+
 export interface GroceryItem {
   id: string;
   name: string;
@@ -208,18 +227,8 @@ export interface GroceryItem {
   packageLabel?: string;
   packageAmount?: number;
   packageUnit?: string;
-  /** Always "unavailable" until a real SM adapter exists — see lib/sm/adapter.ts. Never fabricated. */
-  livePriceStatus: LivePriceStatus;
-  /** Only set when livePriceStatus is "live" or "recently-checked" — packageCount * a real SM effective price. Never populated today. */
-  liveTotalPricePhp?: number;
-  /**
-   * The user's own purchase history for this ingredient at their selected
-   * store — explicitly a *historical* record, never presented as today's
-   * price (see lib/grocery/purchase-history.ts).
-   */
-  lastPaidPricePhp?: number;
-  lastPaidAt?: string;
-  lastPaidStoreId?: string;
+  /** Absent means "Price unavailable" — see GroceryItemPriceInfo above. */
+  priceInfo?: GroceryItemPriceInfo;
 }
 
 /** An ingredient the user already has on hand that's nearing its use-by point. */
@@ -259,6 +268,10 @@ export interface SmStore {
 export interface ShoppingSettings {
   /** Required before any pricing is requested or shown — see components/profile/shopping-settings-card.tsx. */
   store: SmStore | null;
+  /** Philippine geographic location used for PSA/DTI reference lookups (see lib/pricing/geographic.ts) — separate from `store`, which is only used for user-confirmed/receipt SM prices. */
+  region?: string;
+  province?: string;
+  city?: string;
   weeklyBudgetPhp: number;
   pricingMode: PricingMode;
   /** People the grocery list should be scaled to feed — drives servingsRatio in lib/data/grocery-generator.ts. */

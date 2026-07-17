@@ -1,9 +1,10 @@
 import { getCatalogEntry } from "@/lib/grocery/ingredient-catalog";
-import { resolveLastPaid, type PurchaseRecord } from "@/lib/grocery/purchase-history";
 import type { PackageForm, RetailPackage } from "@/lib/grocery/sm-packages";
 import { toBaseAmount, unitKindOf } from "@/lib/grocery/units";
 import type { UsageLine } from "@/lib/grocery/aggregate";
-import type { GroceryItem } from "@/lib/types";
+import { resolvePrice, type PriceMatchContext } from "@/lib/pricing/priority";
+import type { CommodityPrice } from "@/lib/pricing/types";
+import type { GroceryItem, GroceryItemPriceInfo } from "@/lib/types";
 
 /** Rounds a usage amount up to a practical shopping increment — fine-grained for small amounts, coarser for large ones. */
 export function roundToPracticalAmount(amount: number, baseUnit: string): number {
@@ -80,34 +81,74 @@ function toDisplayUnit(amount: number, baseUnit: string): { amount: number; unit
   return { amount, unit: baseUnit };
 }
 
+/** Converts a usage amount into kg (mass) or L (volume) for PSA per-unit pricing. Discrete units (piece, bunch, clove, ...) have no per-kg meaning and return undefined. */
+function toKgOrLiter(amount: number, baseUnit: string): { amount: number; kind: "kg" | "L" } | undefined {
+  if (baseUnit === "g") return { amount: amount / 1000, kind: "kg" };
+  if (baseUnit === "kg") return { amount, kind: "kg" };
+  if (baseUnit === "ml") return { amount: amount / 1000, kind: "L" };
+  if (baseUnit === "L") return { amount, kind: "L" };
+  return undefined;
+}
+
+/**
+ * Turns a resolved CommodityPrice into the cost figure for this grocery
+ * line, per GROCERY CALCULATIONS:
+ *   - PSA references: usageCost = requiredWeightInKg * officialPricePerKg
+ *     (or per liter) — a market-reference/expected cost, not a guaranteed
+ *     checkout price. Unavailable if the usage unit has no per-kg/per-liter
+ *     meaning (e.g. "piece", "bunch") or the resolved price lacks that rate.
+ *   - Every other source (receipt, user-verified-sm, dti-epresyo): checkout
+ *     cost = packageCount * packagePricePhp — an exact, real cost.
+ */
+function computePriceInfo(
+  line: UsageLine,
+  purchase: PurchaseSelection,
+  storeId: string | null,
+  candidates: CommodityPrice[],
+): GroceryItemPriceInfo | undefined {
+  const context: PriceMatchContext = {
+    canonicalIngredientKey: line.canonicalKey,
+    packageAmount: purchase.packageAmount,
+    packageUnit: purchase.packageUnit,
+    storeId: storeId ?? undefined,
+  };
+  const resolved = resolvePrice(context, candidates);
+  if (!resolved) return undefined;
+
+  const isPsaReference = resolved.source === "psa-openstat" || resolved.source === "psa-price-situationer";
+
+  if (isPsaReference) {
+    const converted = toKgOrLiter(line.amount, line.baseUnit);
+    if (!converted) return undefined;
+    const perUnitPrice = converted.kind === "kg" ? resolved.pricePerKgPhp : resolved.pricePerLiterPhp;
+    if (perUnitPrice === undefined) return undefined;
+    return { price: resolved, lineTotalPhp: converted.amount * perUnitPrice, isUsageReference: true };
+  }
+
+  const packageCount = purchase.packageCount ?? 1;
+  return { price: resolved, packageCount, lineTotalPhp: packageCount * resolved.pricePhp, isUsageReference: false };
+}
+
 /**
  * Turns aggregated usage lines into final purchasable grocery items — ids
  * stay deterministic across regenerations so check-off state persists.
  *
- * There is no live SM Markets integration (see lib/sm/adapter.ts), so every
- * item's `livePriceStatus` is always "unavailable" — this function never
- * fabricates a price. The only price data available is the user's own
- * purchase history at their selected store (`storeId`/`purchaseRecords`),
- * surfaced separately as `lastPaidPricePhp` — explicitly historical, never
- * summed into a "current" total (see lib/grocery/basket.ts).
+ * `priceCandidates` is every CommodityPrice available from every source
+ * (PSA OpenSTAT, PSA Price Situationer, DTI e-Presyo, the user's own SM
+ * verifications/receipts — see lib/pricing/), already gathered by the
+ * caller. This function never fetches and never fabricates: an item with
+ * no matching candidate simply has no `priceInfo`, which the UI renders as
+ * "Price unavailable."
  */
 export function buildGroceryItems(
   usageLines: UsageLine[],
   storeId: string | null = null,
-  purchaseRecords: PurchaseRecord[] = [],
+  priceCandidates: CommodityPrice[] = [],
 ): GroceryItem[] {
   return usageLines.map((line) => {
     const purchase = selectPurchase(line.canonicalKey, line.amount, line.baseUnit);
     const id = `gen-${line.canonicalKey}-${line.baseUnit}`.replace(/\s+/g, "-");
-
-    const lastPaid = storeId
-      ? resolveLastPaid(
-          line.canonicalKey,
-          storeId,
-          { packageAmount: purchase.packageAmount, packageUnit: purchase.packageUnit },
-          purchaseRecords,
-        )
-      : undefined;
+    const priceInfo = computePriceInfo(line, purchase, storeId, priceCandidates);
 
     const shared = {
       id,
@@ -116,14 +157,7 @@ export function buildGroceryItems(
       canonicalKey: line.canonicalKey,
       usageAmount: line.amount,
       usageUnit: line.baseUnit,
-      livePriceStatus: "unavailable" as const,
-      ...(lastPaid
-        ? {
-            lastPaidPricePhp: lastPaid.pricePhp,
-            lastPaidAt: lastPaid.purchasedAt,
-            lastPaidStoreId: lastPaid.storeId,
-          }
-        : {}),
+      ...(priceInfo ? { priceInfo } : {}),
     };
 
     if (purchase.packageForm && purchase.packageCount) {

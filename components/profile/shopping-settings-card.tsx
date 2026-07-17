@@ -36,6 +36,34 @@ export function ShoppingSettingsCard({ settings, onChange, onSetStore }: Shoppin
   return (
     <div className="flex flex-col gap-5">
       <div>
+        <p className="mb-1.5 text-sm font-medium text-muted-foreground">Location (Philippines)</p>
+        <p className="mb-2 text-xs text-muted-foreground">
+          Used to request PSA/DTI reference prices for your area — most specific wins (city, then province, then
+          region).
+        </p>
+        <div className="flex flex-col gap-2">
+          <Input
+            placeholder="Region, e.g. Region IV-A (CALABARZON)"
+            defaultValue={settings.region ?? ""}
+            onBlur={(e) => onChange({ region: e.target.value.trim() || undefined })}
+            aria-label="Region"
+          />
+          <Input
+            placeholder="Province, e.g. Cavite"
+            defaultValue={settings.province ?? ""}
+            onBlur={(e) => onChange({ province: e.target.value.trim() || undefined })}
+            aria-label="Province"
+          />
+          <Input
+            placeholder="City or municipality, e.g. Imus"
+            defaultValue={settings.city ?? ""}
+            onBlur={(e) => onChange({ city: e.target.value.trim() || undefined })}
+            aria-label="City or municipality"
+          />
+        </div>
+      </div>
+
+      <div>
         <p className="mb-1.5 text-sm font-medium text-muted-foreground">SM store</p>
         {!editingStore && settings.store ? (
           <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">

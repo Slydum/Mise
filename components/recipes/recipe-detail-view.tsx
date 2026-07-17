@@ -49,7 +49,6 @@ export function RecipeDetailView({ recipe, allRecipes }: RecipeDetailViewProps) 
       amount: ingredient.amount * scale,
       unit: ingredient.unit,
       category: ingredient.category,
-      livePriceStatus: "unavailable",
     }));
     addGroceryItems(items);
     showToast("Added to grocery list");

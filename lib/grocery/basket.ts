@@ -1,71 +1,78 @@
-import type { GroceryItem, LivePriceStatus } from "@/lib/types";
+import type { GroceryItem } from "@/lib/types";
 
 export interface BasketSummary {
-  /** Sum of liveTotalPricePhp across items with a live/recently-checked price. Always 0 until a real SM adapter exists. */
-  liveTotalPhp: number;
-  livePricedCount: number;
-  /** Items with no live price — the overwhelming majority today, since there is no live SM integration. */
+  /** Sum of lineTotalPhp for exact-price items (receipt, user-verified-sm, dti-epresyo). */
+  exactTotalPhp: number;
+  /** Sum of lineTotalPhp for PSA market-reference items — an expected/usage cost, not a guaranteed checkout price. */
+  referenceTotalPhp: number;
+  /** exactTotalPhp + referenceTotalPhp — the number to show as "Projected basket" unless isFullyVerifiedAtStore. */
+  projectedTotalPhp: number;
+  pricedCount: number;
   unavailableCount: number;
   totalItems: number;
-  /** True only when every item has a live price. Never true today. */
-  isLiveComplete: boolean;
+  /** True only when every item is priced, none are PSA references, and every exact price was confirmed/paid at the given store — see describeBasketOutlook. */
+  isFullyVerifiedAtStore: boolean;
   budgetPhp: number;
-  /** null when there's no live total to meaningfully compare against a budget — never show a budget delta against a fabricated or partial total. */
+  /** null when nothing is priced yet — never compare a budget against a fabricated or empty total. */
   budgetDeltaPhp: number | null;
 }
 
 /**
- * Sums only *live* checkout costs (see GroceryItem.liveTotalPricePhp) —
- * never a user's historical last-paid price, which would misrepresent an
- * old price as today's cost (see lib/grocery/purchase-history.ts). Because
- * Mise has no live SM Markets integration, this total is always ₱0 with
- * every item unavailable — that's the honest, correct state, not a bug.
+ * Splits the basket into exact prices (receipt/user-verified-sm/dti —
+ * genuine checkout costs) and PSA market references (expected-cost
+ * estimates), per GROCERY UI's "Exact SM and receipt prices" /
+ * "Official market references" breakdown. Never sums a value for an item
+ * with no priceInfo — that's "Price unavailable," not ₱0.
  */
-export function summarizeBasket(items: GroceryItem[], weeklyBudgetPhp: number): BasketSummary {
-  let liveTotalPhp = 0;
-  let livePricedCount = 0;
+export function summarizeBasket(items: GroceryItem[], weeklyBudgetPhp: number, storeId: string | null): BasketSummary {
+  let exactTotalPhp = 0;
+  let referenceTotalPhp = 0;
+  let pricedCount = 0;
+  let allExactAtStore = true;
 
   for (const item of items) {
-    const isLiveish = item.livePriceStatus === "live" || item.livePriceStatus === "recently-checked";
-    if (isLiveish && item.liveTotalPricePhp !== undefined) {
-      liveTotalPhp += item.liveTotalPricePhp;
-      livePricedCount += 1;
+    if (!item.priceInfo) continue;
+    pricedCount += 1;
+
+    if (item.priceInfo.isUsageReference) {
+      referenceTotalPhp += item.priceInfo.lineTotalPhp;
+      allExactAtStore = false;
+      continue;
     }
+
+    exactTotalPhp += item.priceInfo.lineTotalPhp;
+    const source = item.priceInfo.price.source;
+    const isSmVerifiedHere =
+      (source === "receipt" || source === "user-verified-sm") && item.priceInfo.price.storeId === storeId;
+    if (!isSmVerifiedHere) allExactAtStore = false;
   }
 
   const totalItems = items.length;
-  const unavailableCount = totalItems - livePricedCount;
+  const unavailableCount = totalItems - pricedCount;
+  const projectedTotalPhp = exactTotalPhp + referenceTotalPhp;
 
   return {
-    liveTotalPhp,
-    livePricedCount,
+    exactTotalPhp,
+    referenceTotalPhp,
+    projectedTotalPhp,
+    pricedCount,
     unavailableCount,
     totalItems,
-    isLiveComplete: totalItems > 0 && livePricedCount === totalItems,
+    isFullyVerifiedAtStore: totalItems > 0 && unavailableCount === 0 && allExactAtStore,
     budgetPhp: weeklyBudgetPhp,
-    budgetDeltaPhp: livePricedCount > 0 ? weeklyBudgetPhp - liveTotalPhp : null,
+    budgetDeltaPhp: pricedCount > 0 ? weeklyBudgetPhp - projectedTotalPhp : null,
   };
 }
 
-export type BasketStatus = "live" | "recently-checked" | "partially-available" | "refresh-required" | "unavailable";
+export type BasketOutlook = "verified" | "projected" | "unavailable";
 
 /**
- * The status-driven label for the Grocery summary card (Live SM basket /
- * Recently checked SM basket / Partially available / Refresh required /
- * Live prices unavailable). Derived purely from each item's
- * `livePriceStatus` — since that's always "unavailable" today, this always
- * resolves to "unavailable", which is the correct, honest state.
+ * "Verified SM basket" only when every included price was confirmed/paid
+ * at the selected branch; "Projected basket" once exact prices and/or PSA
+ * references combine; "unavailable" when nothing is priced at all.
  */
-export function deriveBasketStatus(items: GroceryItem[]): BasketStatus {
-  if (items.length === 0) return "unavailable";
-
-  const statuses = new Set<LivePriceStatus>(items.map((i) => i.livePriceStatus));
-  const onlyHas = (...allowed: LivePriceStatus[]) => [...statuses].every((s) => allowed.includes(s));
-  const hasAny = (...target: LivePriceStatus[]) => target.some((s) => statuses.has(s));
-
-  if (onlyHas("live")) return "live";
-  if (onlyHas("live", "recently-checked")) return "recently-checked";
-  if (hasAny("live", "recently-checked")) return "partially-available";
-  if (hasAny("refresh-required")) return "refresh-required";
-  return "unavailable";
+export function describeBasketOutlook(summary: BasketSummary): BasketOutlook {
+  if (summary.pricedCount === 0) return "unavailable";
+  if (summary.isFullyVerifiedAtStore) return "verified";
+  return "projected";
 }

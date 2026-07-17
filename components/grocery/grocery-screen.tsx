@@ -16,7 +16,7 @@ import { useDietaryStyle } from "@/lib/hooks/use-dietary-style";
 import { useGroceryList } from "@/lib/hooks/use-grocery-list";
 import { useShoppingSettings } from "@/lib/hooks/use-shopping-settings";
 import { useToast } from "@/lib/hooks/use-toast";
-import { deriveBasketStatus, summarizeBasket, type BasketStatus } from "@/lib/grocery/basket";
+import { describeBasketOutlook, summarizeBasket, type BasketOutlook } from "@/lib/grocery/basket";
 import { formatApproxPhp, formatPhp } from "@/lib/grocery/currency";
 import { formatQuantity } from "@/lib/ingredients";
 import type { GroceryCategory, GroceryItem } from "@/lib/types";
@@ -33,12 +33,10 @@ const CATEGORY_EMOJI: Record<GroceryCategory, string> = {
   other: "🧺",
 };
 
-const BASKET_STATUS_LABELS: Record<BasketStatus, string> = {
-  live: "Live SM basket",
-  "recently-checked": "Recently checked SM basket",
-  "partially-available": "Partially available",
-  "refresh-required": "Refresh required",
-  unavailable: "Live prices unavailable",
+const OUTLOOK_LABELS: Record<BasketOutlook, string> = {
+  verified: "Verified SM basket",
+  projected: "Projected grocery basket",
+  unavailable: "Current grocery outlook",
 };
 
 const MANUAL_ID_PREFIX = "extra-manual-";
@@ -47,7 +45,11 @@ export function GroceryScreen() {
   const { dietaryStyle } = useDietaryStyle();
   const { settings: shoppingSettings } = useShoppingSettings();
   const store = shoppingSettings.store;
-  const grocery = useGroceryList(dietaryStyle, shoppingSettings.householdSize, store?.storeId ?? null);
+  const location = useMemo(
+    () => ({ region: shoppingSettings.region, province: shoppingSettings.province, city: shoppingSettings.city }),
+    [shoppingSettings.region, shoppingSettings.province, shoppingSettings.city],
+  );
+  const grocery = useGroceryList(dietaryStyle, shoppingSettings.householdSize, store?.storeId ?? null, location);
   const { message: toastMessage, showToast } = useToast();
 
   const [hideCompleted, setHideCompleted] = useState(false);
@@ -74,10 +76,10 @@ export function GroceryScreen() {
   const anyChecked = doneCount > 0;
 
   const basket = useMemo(
-    () => summarizeBasket(grocery.items, shoppingSettings.weeklyBudgetPhp),
-    [grocery.items, shoppingSettings.weeklyBudgetPhp],
+    () => summarizeBasket(grocery.items, shoppingSettings.weeklyBudgetPhp, store?.storeId ?? null),
+    [grocery.items, shoppingSettings.weeklyBudgetPhp, store?.storeId],
   );
-  const basketStatus = useMemo(() => deriveBasketStatus(grocery.items), [grocery.items]);
+  const outlook = useMemo(() => describeBasketOutlook(basket), [basket]);
 
   const budgetStatus =
     basket.budgetDeltaPhp !== null
@@ -177,15 +179,21 @@ export function GroceryScreen() {
           <div className="mx-5 flex flex-col gap-4 rounded-3xl border border-border/60 bg-card p-6 shadow-soft">
             {total > 0 ? (
               <div className="flex flex-col gap-1 border-b border-border/60 pb-4">
-                <p className="text-sm font-medium text-muted-foreground">{BASKET_STATUS_LABELS[basketStatus]}</p>
-                {basket.livePricedCount > 0 ? (
-                  <p className="font-serif text-3xl tracking-tight">{formatApproxPhp(basket.liveTotalPhp)}</p>
+                <p className="text-sm font-medium text-muted-foreground">{OUTLOOK_LABELS[outlook]}</p>
+                {outlook === "unavailable" ? (
+                  <p className="font-serif text-xl tracking-tight text-muted-foreground">Price unavailable</p>
                 ) : (
-                  <p className="font-serif text-xl tracking-tight text-muted-foreground">No live prices yet</p>
+                  <p className="font-serif text-3xl tracking-tight">{formatApproxPhp(basket.projectedTotalPhp)}</p>
                 )}
+                {outlook === "projected" ? (
+                  <div className="flex flex-col gap-0.5 text-sm text-muted-foreground">
+                    {basket.exactTotalPhp > 0 ? <p>Exact SM, receipt &amp; DTI prices: {formatPhp(basket.exactTotalPhp)}</p> : null}
+                    {basket.referenceTotalPhp > 0 ? <p>Official market references: {formatPhp(basket.referenceTotalPhp)}</p> : null}
+                  </div>
+                ) : null}
                 {budgetStatus ? <p className="text-sm text-muted-foreground">{budgetStatus}</p> : null}
                 <p className="text-xs text-muted-foreground">
-                  {basket.livePricedCount} of {basket.totalItems} priced live · {basket.unavailableCount} unavailable
+                  {basket.pricedCount} of {basket.totalItems} priced · {basket.unavailableCount} price unavailable
                 </p>
               </div>
             ) : null}
@@ -257,10 +265,9 @@ export function GroceryScreen() {
                         const isChecked = Boolean(grocery.checked[item.id]);
                         const quantity = formatQuantity(item.amount, item.unit);
                         const isManual = item.id.startsWith(MANUAL_ID_PREFIX);
-                        const lastPaidLabel =
-                          item.lastPaidPricePhp !== undefined
-                            ? `Last paid ${formatApproxPhp(item.lastPaidPricePhp)}`
-                            : undefined;
+                        const priceLabel = item.priceInfo
+                          ? `${item.priceInfo.isUsageReference ? "≈ " : ""}${formatPhp(item.priceInfo.lineTotalPhp)} · ${item.priceInfo.price.sourceLabel}`
+                          : undefined;
                         return (
                           <li key={item.id} className={cn(index > 0 && "border-t border-border/60")}>
                             <div
@@ -291,9 +298,11 @@ export function GroceryScreen() {
                               </button>
                               <div className="flex shrink-0 flex-col items-end">
                                 <span className="text-sm text-muted-foreground">{quantity}</span>
-                                {lastPaidLabel ? (
-                                  <span className="text-xs text-muted-foreground/80">{lastPaidLabel}</span>
-                                ) : null}
+                                {priceLabel ? (
+                                  <span className="text-xs text-muted-foreground/80">{priceLabel}</span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground/60">Price unavailable</span>
+                                )}
                               </div>
                               <button
                                 type="button"
@@ -369,10 +378,11 @@ export function GroceryScreen() {
         }}
         item={priceDetailItem}
         storeName={store?.storeName}
-        onLogPrice={(pricePhp) => {
+        city={shoppingSettings.city ?? store?.storeCity}
+        onLogPrice={(pricePhp, source) => {
           if (priceDetailItem) {
-            grocery.logPurchasePrice(priceDetailItem, pricePhp);
-            showToast("Price logged");
+            grocery.logPurchasePrice(priceDetailItem, pricePhp, source);
+            showToast(source === "receipt" ? "Receipt price logged" : "Price verified");
           }
         }}
       />
