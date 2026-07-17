@@ -308,13 +308,13 @@ export function PriceDetailSheet({ open, onOpenChange, item, stores, currentStor
                         key={`${c.value}-${i}`}
                         type="button"
                         onClick={() => setDraftPrice(String(c.value))}
-                        title={c.context}
                         className={cn(
-                          "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          "flex max-w-[calc(50%-0.2rem)] flex-col items-start gap-0.5 rounded-xl border px-3 py-1.5 text-left transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring",
                           draftPrice === String(c.value) ? "border-primary bg-primary/10" : "border-border/60 text-muted-foreground",
                         )}
                       >
-                        {formatPhp(c.value)}
+                        <span className="text-sm font-medium">{formatPhp(c.value)}</span>
+                        <span className="w-full truncate text-[11px] text-muted-foreground/80">{c.context}</span>
                       </button>
                     ))}
                   </div>
