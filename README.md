@@ -159,6 +159,40 @@ Key distinctions the app enforces everywhere:
    `CommodityPrice` data the moment an adapter produces it; no call site
    should need to change.
 
+## Location & nearby SM store detection
+
+Profile → Shopping has a "Use my location" button (`lib/geolocation.ts`) and a
+"Find nearby SM stores" button (`lib/pricing/sm-locator.ts`). Unlike the
+PSA/DTI/SM price adapters above, **this feature is genuinely live** — it
+needs no server and no data partnership, because it runs entirely in the
+end user's own browser, which has normal internet access even though this
+coding session's outbound access is blocked.
+
+- **"Use my location"** calls `navigator.geolocation.getCurrentPosition()`,
+  then reverse-geocodes the coordinates via OpenStreetMap's Nominatim API
+  (`lib/pricing/geocoding.ts`) to prefill Region/Province/City — never
+  overwriting a field Nominatim didn't actually return
+  (`mapNominatimAddress` is pure and unit-tested against that).
+- **"Find nearby SM stores"** queries OpenStreetMap's Overpass API for
+  supermarkets/hypermarkets/department stores named SM/Savemore near the
+  user's coordinates, ranks them by great-circle distance
+  (`haversineDistanceMeters`), and lists them for the user to tap.
+  Selecting a result only prefills the store-name/city/address fields —
+  saving still requires the user to press "Save store," so nothing is
+  auto-applied.
+- Both are **community-sourced, best-effort data**, labeled as such in the
+  UI ("Location lookup powered by OpenStreetMap." /
+  "Store search powered by OpenStreetMap community data — coverage isn't
+  guaranteed complete; confirm below before saving.") — coverage of any
+  given SM branch on OpenStreetMap isn't guaranteed, so the free-text
+  fields remain the source of truth and manual entry still works exactly
+  as before.
+- Nominatim's usage policy expects a proper `User-Agent` and light,
+  occasional use; browsers block client JS from setting that header. This
+  is acceptable for a single user's manual, button-triggered lookups, but
+  is worth revisiting (a self-hosted instance or a paid geocoding
+  provider) if the app gains real traffic.
+
 ## Supabase (next step)
 
 1. Copy `.env.example` to `.env.local` and fill in the project URL + anon key.
