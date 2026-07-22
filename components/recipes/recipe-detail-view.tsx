@@ -22,7 +22,7 @@ interface RecipeDetailViewProps {
   allRecipes: Recipe[];
 }
 
-/** Full recipe detail: hero, servings-scaled ingredients/nutrition, add-to-plan/grocery, steps. */
+/** Full recipe detail: hero, servings-scaled ingredients, per-serving nutrition, add-to-plan/grocery, steps. */
 export function RecipeDetailView({ recipe, allRecipes }: RecipeDetailViewProps) {
   const { dietaryStyle } = useDietaryStyle();
   const { message: toastMessage, showToast } = useToast();
@@ -35,11 +35,15 @@ export function RecipeDetailView({ recipe, allRecipes }: RecipeDetailViewProps) 
   const isCustom = recipe.id.startsWith(CUSTOM_RECIPE_ID_PREFIX);
   const cookHref = isCustom ? `/cook/custom?id=${recipe.id}` : `/cook/${recipe.id}`;
 
+  // recipe.nutrition is always per single serving (see recipe-card.tsx and
+  // today-screen.tsx, which both read it unscaled) — the servings stepper
+  // changes how much to cook/buy, not what one serving contains, so it must
+  // never multiply these values.
   const nutritionChips = [
-    { label: "Calories", value: Math.round(recipe.nutrition.calories * scale) },
-    { label: "Protein", value: `${Math.round(recipe.nutrition.protein * scale)}g` },
-    { label: "Carbs", value: `${Math.round(recipe.nutrition.carbs * scale)}g` },
-    { label: "Fat", value: `${Math.round(recipe.nutrition.fat * scale)}g` },
+    { label: "Calories", value: Math.round(recipe.nutrition.calories) },
+    { label: "Protein", value: `${Math.round(recipe.nutrition.protein)}g` },
+    { label: "Carbs", value: `${Math.round(recipe.nutrition.carbs)}g` },
+    { label: "Fat", value: `${Math.round(recipe.nutrition.fat)}g` },
   ];
 
   const handleAddToGrocery = () => {

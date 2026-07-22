@@ -356,13 +356,16 @@ export function RecipeForm() {
             onClick={() => setShowNutrition((v) => !v)}
             className="flex items-center justify-between text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <h2 className="font-serif text-2xl">Nutrition</h2>
+            <h2 className="font-serif text-2xl">Nutrition (per serving)</h2>
             <span className="text-sm text-muted-foreground">
               {showNutrition ? "Hide" : "Add (optional)"}
             </span>
           </button>
           {showNutrition ? (
             <div className="grid grid-cols-2 gap-3">
+              <p className="col-span-2 -mt-1 text-xs text-muted-foreground">
+                Enter values for a single serving, not the whole recipe.
+              </p>
               <label className="flex flex-col gap-1 text-sm font-semibold">
                 Calories
                 <Input
